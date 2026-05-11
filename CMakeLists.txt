@@ -43,6 +43,14 @@ juce_add_plugin(${PLUGIN_NAME}
 target_sources(${PLUGIN_NAME} PRIVATE
     Source/PluginProcessor.cpp
     Source/PluginProcessor.h
+    Source/PluginEditor.h
+    Source/PluginEditor.cpp
+
+    Source/ui/Theme.h
+    Source/ui/HiddenCursorDrag.h
+    Source/ui/HoverFader.h
+    Source/ui/BandView.h
+    Source/ui/BandView.cpp
 
     Source/vital_dsp/compressor.cpp
     Source/vital_dsp/compressor.h
@@ -73,6 +81,7 @@ target_sources(${PLUGIN_NAME} PRIVATE
 
 target_include_directories(${PLUGIN_NAME} PRIVATE
     Source
+    Source/ui
     Source/vital_dsp
 )
 

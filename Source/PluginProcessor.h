@@ -70,6 +70,8 @@ public:
     void initVals();
     void updParams();
 
+    juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return parameters; }
+
 private:
     //==============================================================================
 

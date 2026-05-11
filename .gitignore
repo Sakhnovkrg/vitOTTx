@@ -24,6 +24,9 @@ DerivedData/
 Thumbs.db
 .DS_Store
 
+# Local notes / scratch
+ref/
+
 # Binaries
 *.vst3
 *.exe

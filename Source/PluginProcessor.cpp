@@ -16,6 +16,7 @@
 
 #include "PluginProcessor.h"
 #include "vital_dsp/utilities/smooth_value.h"
+#include "PluginEditor.h"
 //==============================================================================
 VitOttAudioProcessor::VitOttAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -43,15 +44,15 @@ VitOttAudioProcessor::VitOttAudioProcessor()
             std::make_unique<juce::AudioParameterFloat>("high_cross_freq", "Mid/High Freq", 20.f, 18000.f, 2500.f),
             std::make_unique<juce::AudioParameterFloat>("low_lower_thres", "Low (Lower) Threshold", -80, 0, -35.0),
             std::make_unique<juce::AudioParameterFloat>("low_upper_thres", "Low (Upper) Threshold", -80, 0, -28.0),
-            std::make_unique<juce::AudioParameterFloat>("low_lower_ratio", "Low (Lower) Ratio", 0, 1.0, 0.8),
+            std::make_unique<juce::AudioParameterFloat>("low_lower_ratio", "Low (Lower) Ratio", -1.0, 1.0, 0.8),
             std::make_unique<juce::AudioParameterFloat>("low_upper_ratio", "Low (Upper) Ratio", 0, 1.0, 0.9),
             std::make_unique<juce::AudioParameterFloat>("band_lower_thres", "Mid (Lower) Threshold", -80, 0, -36.0),
             std::make_unique<juce::AudioParameterFloat>("band_upper_thres", "Mid (Upper) Threshold", -80, 0, -25.0),
-            std::make_unique<juce::AudioParameterFloat>("band_lower_ratio", "Mid (Lower) Ratio", 0, 1.0, 0.8),
+            std::make_unique<juce::AudioParameterFloat>("band_lower_ratio", "Mid (Lower) Ratio", -1.0, 1.0, 0.8),
             std::make_unique<juce::AudioParameterFloat>("band_upper_ratio", "Mid (Upper) Ratio", 0, 1.0, 0.857),
             std::make_unique<juce::AudioParameterFloat>("high_lower_thres", "High (Lower) Threshold", -80, 0, -35.0),
             std::make_unique<juce::AudioParameterFloat>("high_upper_thres", "High (Upper) Threshold", -80, 0, -30.0),
-            std::make_unique<juce::AudioParameterFloat>("high_lower_ratio", "High (Lower) Ratio", 0, 1.0, 0.8),
+            std::make_unique<juce::AudioParameterFloat>("high_lower_ratio", "High (Lower) Ratio", -1.0, 1.0, 0.8),
             std::make_unique<juce::AudioParameterFloat>("high_upper_ratio", "High (Upper) Ratio", 0, 1.0, 1.0),
                            })
 #endif
@@ -325,12 +326,12 @@ void VitOttAudioProcessor::writeAudio(vital::poly_float* comp_buf, juce::AudioSa
 //==============================================================================
 bool VitOttAudioProcessor::hasEditor() const
 {
-    return false; // (change this to false if you choose to not supply an editor)
+    return true;
 }
 
 juce::AudioProcessorEditor* VitOttAudioProcessor::createEditor()
 {
-    return nullptr;
+    return new vitottx::VitOttAudioProcessorEditor(*this);
 }
 
 //==============================================================================
