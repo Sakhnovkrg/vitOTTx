@@ -1,0 +1,10 @@
+@echo off
+rem === Plugin name ===
+set "PLUGIN_NAME=vitOTTx"
+
+rem === Build tools ===
+set "VS_ROOT=C:\Program Files\Microsoft Visual Studio\18\Community"
+set "VCVARS=%VS_ROOT%\VC\Auxiliary\Build\vcvarsall.bat"
+set "CMAKE=%VS_ROOT%\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"
+set "NINJA=%VS_ROOT%\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
+set "VS_ARCH=x64"

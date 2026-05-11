@@ -1,6 +1,34 @@
-Builds/VisualStudio2019/x64
-Builds/VisualStudio2019/.vs
-!*.cpp
-!*.hpp
-!*.c
-!*.h
+# Build
+build/
+build-xcode/
+
+# Local build config (paths to tools)
+config.bat
+
+# IDE
+.vs/
+.vscode/*.json
+!.vscode/*.json.example
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.vcxproj.user
+
+# Xcode
+xcuserdata/
+*.xcworkspace
+DerivedData/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Binaries
+*.vst3
+*.exe
+*.dll
+*.lib
+*.exp
+*.obj
+*.pdb
