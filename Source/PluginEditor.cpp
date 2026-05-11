@@ -39,17 +39,23 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
       lowBand (p.getAPVTS(), theme, makeIds("low")),
       midBand (p.getAPVTS(), theme, makeIds("band")),
       highBand(p.getAPVTS(), theme, makeIds("high")),
+      inKnob     (theme),
+      outKnob    (theme),
       mixKnob    (theme),
       lowKnob    (theme),
       bandKnob   (theme),
       highKnob   (theme),
       attackKnob (theme),
-      releaseKnob(theme)
+      releaseKnob(theme),
+      lowCrossHandle (p.getAPVTS(), theme, CrossoverHandle::Side::Low),
+      highCrossHandle(p.getAPVTS(), theme, CrossoverHandle::Side::High)
 {
     addAndMakeVisible(lowBand);
     addAndMakeVisible(midBand);
     addAndMakeVisible(highBand);
 
+    setupKnob(inKnob,      "in_gain",  "IN");
+    setupKnob(outKnob,     "out_gain", "OUT");
     setupKnob(mixKnob,     "mix",      "MIX");
     setupKnob(lowKnob,     "lgain",    "LOW");
     setupKnob(bandKnob,    "mgain",    "BAND");
@@ -57,8 +63,13 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
     setupKnob(attackKnob,  "att_time", "ATTACK");
     setupKnob(releaseKnob, "rel_time", "RELEASE");
 
-    for (auto* k : { &mixKnob, &lowKnob, &bandKnob, &highKnob, &attackKnob, &releaseKnob })
+    for (auto* k : { &inKnob, &outKnob, &mixKnob, &lowKnob, &bandKnob, &highKnob, &attackKnob, &releaseKnob })
         addAndMakeVisible(*k);
+
+    addAndMakeVisible(lowCrossHandle);
+    addAndMakeVisible(highCrossHandle);
+    lowCrossHandle.onFreqChange  = [this]() { resized(); };
+    highCrossHandle.onFreqChange = [this]() { resized(); };
 
     setResizable(true, true);
     setResizeLimits(BaseMetrics::kReferenceWidth,
@@ -111,15 +122,64 @@ void VitOttAudioProcessorEditor::resized()
     using juce::FlexBox;
     using juce::FlexItem;
 
-    const int bandsPadding = theme.scaledInt(16);
-    auto bandsInner = bandsArea.reduced(bandsPadding, 0);
+    const int bandsPadding    = theme.scaledInt(16);
+    const int halfGap         = bandsPadding / 2;
+    const int handleThickness = theme.scaledInt(4);
+    const int minBandWidth    = theme.scaledInt(35);
+    const int minMidWidth     = theme.scaledInt(35);
 
-    FlexBox bands;
-    bands.flexDirection = FlexBox::Direction::row;
-    bands.items.add(FlexItem(lowBand ).withFlex(1.0f).withMargin({ 0, (float) bandsPadding, 0, 0 }));
-    bands.items.add(FlexItem(midBand ).withFlex(1.0f).withMargin({ 0, (float) bandsPadding, 0, 0 }));
-    bands.items.add(FlexItem(highBand).withFlex(1.0f));
-    bands.performLayout(bandsInner.toFloat());
+    auto bandsInner = bandsArea.reduced(bandsPadding, 0);
+    const int rangeLeft  = bandsInner.getX();
+    const int rangeRight = bandsInner.getRight();
+
+    const float lowFreq  = lowCrossHandle.getFrequency();
+    const float highFreq = highCrossHandle.getFrequency();
+
+    const int lowX  = CrossoverHandle::freqToX(lowFreq,  rangeLeft, rangeRight);
+    const int highX = CrossoverHandle::freqToX(highFreq, rangeLeft, rangeRight);
+
+    const bool lowCollapsed  = (lowX  - rangeLeft) < minBandWidth;
+    const bool highCollapsed = (rangeRight - highX) < minBandWidth;
+
+    auto makeBandRect = [&](int leftX, int rightX) -> juce::Rectangle<int>
+    {
+        const int w = juce::jmax(0, rightX - leftX);
+        return { leftX, bandsInner.getY(), w, bandsInner.getHeight() };
+    };
+
+    const int midLeftX  = lowCollapsed  ? rangeLeft  : (lowX  + halfGap);
+    const int midRightX = highCollapsed ? rangeRight : (highX - halfGap);
+
+    lowBand.setVisible(!lowCollapsed);
+    if (!lowCollapsed)
+        lowBand.setBounds(makeBandRect(rangeLeft, lowX - halfGap));
+
+    midBand.setBounds(makeBandRect(midLeftX, midRightX));
+
+    highBand.setVisible(!highCollapsed);
+    if (!highCollapsed)
+        highBand.setBounds(makeBandRect(highX + halfGap, rangeRight));
+
+    const int lowHandleX  = lowCollapsed
+                              ? panelBounds.getX()    + bandsPadding / 2
+                              : lowX;
+    const int highHandleX = highCollapsed
+                              ? panelBounds.getRight() - bandsPadding / 2
+                              : highX;
+
+    lowCrossHandle.setRange(rangeLeft, rangeRight);
+    lowCrossHandle.setSnapMinimumWidth(minBandWidth);
+    lowCrossHandle.setMinMidWidth(minMidWidth);
+    lowCrossHandle.setCounterpartX(highX);
+    lowCrossHandle.setBounds(lowHandleX - handleThickness / 2, bandsInner.getY(),
+                             handleThickness, bandsInner.getHeight());
+
+    highCrossHandle.setRange(rangeLeft, rangeRight);
+    highCrossHandle.setSnapMinimumWidth(minBandWidth);
+    highCrossHandle.setMinMidWidth(minMidWidth);
+    highCrossHandle.setCounterpartX(lowX);
+    highCrossHandle.setBounds(highHandleX - handleThickness / 2, bandsInner.getY(),
+                              handleThickness, bandsInner.getHeight());
 }
 
 void VitOttAudioProcessorEditor::setupKnob(Knob& slot,
@@ -145,8 +205,8 @@ void VitOttAudioProcessorEditor::layoutLeftSection(juce::Rectangle<int> area)
 
     FlexBox top;
     top.flexDirection = FlexBox::Direction::row;
-    top.items.add(FlexItem().withFlex(1.0f).withMargin({ 0, (float) gap, 0, 0 }));
-    top.items.add(FlexItem().withFlex(1.0f).withMargin({ 0, (float) gap, 0, 0 }));
+    top.items.add(FlexItem(inKnob ).withFlex(1.0f).withMargin({ 0, (float) gap, 0, 0 }));
+    top.items.add(FlexItem(outKnob).withFlex(1.0f).withMargin({ 0, (float) gap, 0, 0 }));
     top.items.add(FlexItem(mixKnob).withFlex(1.0f));
     top.performLayout(topRow.toFloat());
 

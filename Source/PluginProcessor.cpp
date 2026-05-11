@@ -150,6 +150,19 @@ void VitOttAudioProcessor::updParams()
     vals[vital::MultibandCompressor::kMHFrequency - 1]->set(hband_freq);
 
     vals[vital::MultibandCompressor::kMix - 1]->set(mix);
+
+    // Collapse bands out of the DSP graph when crossovers hit their extremes —
+    // saves CPU and avoids processing inaudible split paths.
+    const bool lowCollapsed  = lband_freq <= 21.0f;
+    const bool highCollapsed = hband_freq >= 17500.0f;
+    int enabledMode = vital::MultibandCompressor::kMultiband;
+    if (lowCollapsed && highCollapsed)
+        enabledMode = vital::MultibandCompressor::kSingleBand;
+    else if (lowCollapsed)
+        enabledMode = vital::MultibandCompressor::kHighBand;
+    else if (highCollapsed)
+        enabledMode = vital::MultibandCompressor::kLowBand;
+    vals[vital::MultibandCompressor::kEnabledBands - 1]->set(enabledMode);
 }
 
 

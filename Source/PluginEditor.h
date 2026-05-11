@@ -20,6 +20,7 @@
 
 #include "PluginProcessor.h"
 #include "ui/BandView.h"
+#include "ui/CrossoverHandle.h"
 #include "ui/Knob.h"
 #include "ui/Theme.h"
 
@@ -49,12 +50,17 @@ private:
 
     juce::Rectangle<int> panelBounds;
 
+    Knob inKnob;
+    Knob outKnob;
     Knob mixKnob;
     Knob lowKnob;
     Knob bandKnob;
     Knob highKnob;
     Knob attackKnob;
     Knob releaseKnob;
+
+    CrossoverHandle lowCrossHandle;
+    CrossoverHandle highCrossHandle;
 
     void setupKnob(Knob& slot, const char* paramId, const juce::String& caption);
     void layoutLeftSection (juce::Rectangle<int> area);
