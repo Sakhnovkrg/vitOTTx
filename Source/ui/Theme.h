@@ -25,18 +25,21 @@ namespace vitottx
 
 struct Palette
 {
-    juce::Colour background       { 0xff2a2d31 };
-    juce::Colour panel            { 0xff1a1d21 };
-    juce::Colour panelOutline     { 0xff0a0c0e };
-    juce::Colour barFillUpper     { 0xff4ed4af };
-    juce::Colour barFillLower     { 0xff2e8f76 };
-    juce::Colour barFillDisabled  { 0xff5a5e64 };
+    juce::Colour background       { 0xff0d1218 };
+    juce::Colour panel            { 0xff06090d };
+    juce::Colour panelOutline     { 0xff000004 };
+    juce::Colour barFillUpper     { 0xff168f78 };
+    juce::Colour barFillLower     { 0xff083a2f };
+    juce::Colour barFillDisabled  { 0xff2c3038 };
     juce::Colour barStripe        { 0x33ffffff };
-    juce::Colour edgeHandle       { 0xff5fd9ba };
-    juce::Colour hoverHandle      { 0xffffffff };
-    juce::Colour textPrimary      { 0xffe6e8eb };
-    juce::Colour textSecondary    { 0xff9aa0a6 };
-    juce::Colour accent           { 0xffe04848 };
+    juce::Colour hoverHandle      { 0xccffffff };
+    juce::Colour meter            { 0xff1de9b6 };
+    juce::Colour knobBody         { 0xff10161c };
+    juce::Colour knobArcTrack     { 0xff1f262e };
+    juce::Colour knobArcActive    { 0xff1de9b6 };
+    juce::Colour knobPointer      { 0xffffffff };
+    juce::Colour textPrimary      { 0xffc8d4d8 };
+    juce::Colour textSecondary    { 0xff7a8890 };
 };
 
 struct BaseMetrics
@@ -45,7 +48,6 @@ struct BaseMetrics
     static constexpr float kPanelOutlineWidth = 1.0f;
     static constexpr float kBarCornerRadius   = 3.0f;
     static constexpr float kBarEdgeThickness  = 3.0f;
-    static constexpr float kBarTextureSpacing = 4.0f;
     static constexpr int   kPadding           = 8;
     static constexpr int   kSmallPadding      = 4;
     static constexpr int   kLabelHeight       = 14;
@@ -62,10 +64,12 @@ struct BaseMetrics
     static constexpr float kThresholdDragMultiplier = 0.5f;
     static constexpr float kRatioDragMultiplier     = 0.6f;
 
+    // Pixel-rate sensitivity for rotary drags. 0.0024 ≈ full sweep over 420 px.
+    static constexpr float kKnobDragSensitivity     = 0.0024f;
+    static constexpr float kKnobDragSensitivityFine = 0.00048f;
+
     static constexpr int   kReferenceWidth        = 640;
-    static constexpr int   kReferenceHeight       = 230;
-    static constexpr int   kLeftSectionWidth      = 175;
-    static constexpr int   kRightSectionWidth     = 117;
+    static constexpr int   kReferenceHeight       = 180;
 };
 
 class Theme
@@ -82,7 +86,6 @@ public:
     int panelCornerRadius() const noexcept { return scaledInt(juce::roundToInt(BaseMetrics::kPanelCornerRadius)); }
     int barCornerRadius()   const noexcept { return scaledInt(juce::roundToInt(BaseMetrics::kBarCornerRadius)); }
     float barEdgeThickness() const noexcept { return scaled(BaseMetrics::kBarEdgeThickness); }
-    float barTextureSpacing() const noexcept { return scaled(BaseMetrics::kBarTextureSpacing); }
     int padding()       const noexcept { return scaledInt(BaseMetrics::kPadding); }
     int smallPadding()  const noexcept { return scaledInt(BaseMetrics::kSmallPadding); }
     int labelHeight()   const noexcept { return scaledInt(BaseMetrics::kLabelHeight); }

@@ -28,14 +28,6 @@
 namespace vitottx
 {
 
-// Visualises one frequency band of the multiband compressor and provides
-// click-and-drag editing of its four parameters: upper/lower threshold and
-// upper/lower ratio.
-//
-// Layout: the upper bar fills the region above upper_threshold; the lower bar
-// fills the region below lower_threshold. Inside each bar a stack of stripes
-// represents the corresponding ratio using Vital's compressed-dB mapping
-// (see paintRatioStripes for details).
 class BandView : public juce::Component, private juce::Timer
 {
 public:
@@ -53,9 +45,10 @@ public:
 
     ~BandView() override;
 
-    // Fires for every drag-induced parameter change. Used by the editor to
-    // display a transient HUD with the current value.
     std::function<void(const juce::String& paramId, float value)> onParamChange;
+
+    void setInputLevels (float leftDb, float rightDb);
+    void setOutputLevels(float leftDb, float rightDb);
 
     void paint(juce::Graphics&) override;
 
@@ -77,12 +70,13 @@ private:
 
     // Painting
     void paintBar         (juce::Graphics&, juce::Rectangle<float> rect, bool isUpper,
-                           float hoverEdgeAlpha, float hoverBodyAlpha) const;
+                           float hoverBodyAlpha) const;
     void paintBarFill     (juce::Graphics&, juce::Rectangle<float> rect, bool isUpper) const;
     void paintRatioStripes(juce::Graphics&, juce::Rectangle<float> rect, bool isUpper,
                            float hoverBodyAlpha) const;
     void paintHoverEdge   (juce::Graphics&, juce::Rectangle<float> rect, bool isUpper,
                            float hoverEdgeAlpha) const;
+    void paintMeters      (juce::Graphics&) const;
 
     // Hit testing & hover
     HitZone hitTest(juce::Point<int> p) const;
@@ -120,6 +114,11 @@ private:
     HoverFader hoverLowerEdgeFader;
     HoverFader hoverUpperBodyFader;
     HoverFader hoverLowerBodyFader;
+
+    float inputLeftDb   = BaseMetrics::kMinDb;
+    float inputRightDb  = BaseMetrics::kMinDb;
+    float outputLeftDb  = BaseMetrics::kMinDb;
+    float outputRightDb = BaseMetrics::kMinDb;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (BandView)
 };

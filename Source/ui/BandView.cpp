@@ -25,15 +25,17 @@ namespace vitottx
 
 namespace
 {
-    // Stripe-drawing constants, mirroring Vital's compressor_editor.{h,cpp}.
     constexpr int   kDbSections             = 8;
     constexpr int   kRatioDbLines           = 14;
     constexpr float kStripeHeight           = 1.0f;
-    constexpr float kStripeAlphaMult        = 2.5f;
-    constexpr float kStripeAlphaMultOnHover = 5.0f;
+    constexpr float kStripeAlphaMult        = 1.8f;
+    constexpr float kStripeAlphaMultOnHover = 3.0f;
     constexpr float kStripeInsetPx          = 3.0f;
     constexpr float kHoverEdgeHeight        = 3.0f;
     constexpr float kRatioActiveEpsilon     = 0.001f;
+    constexpr float kMeterBarWidth          = 12.0f;
+    constexpr float kMeterChannelGap        = 1.5f;
+    constexpr float kMeterInputLineHeight   = 1.5f;
 
     juce::RangedAudioParameter& parameterRef(juce::AudioProcessorValueTreeState& apvts,
                                              const juce::String& id)
@@ -43,9 +45,6 @@ namespace
         return *p;
     }
 }
-
-//==============================================================================
-// Construction
 
 BandView::BandView(juce::AudioProcessorValueTreeState& apvts,
                    const Theme& t,
@@ -103,20 +102,24 @@ juce::Rectangle<float> BandView::lowerBarRect() const
 
 void BandView::paint(juce::Graphics& g)
 {
-    paintBar(g, upperBarRect(), /*isUpper=*/true,
-             hoverUpperEdgeFader.getValue(), hoverUpperBodyFader.getValue());
-    paintBar(g, lowerBarRect(), /*isUpper=*/false,
-             hoverLowerEdgeFader.getValue(), hoverLowerBodyFader.getValue());
+    const auto upper = upperBarRect();
+    const auto lower = lowerBarRect();
+
+    paintBar(g, upper, /*isUpper=*/true,  hoverUpperBodyFader.getValue());
+    paintBar(g, lower, /*isUpper=*/false, hoverLowerBodyFader.getValue());
+    paintMeters(g);
+
+    paintHoverEdge(g, upper, /*isUpper=*/true,  hoverUpperEdgeFader.getValue());
+    paintHoverEdge(g, lower, /*isUpper=*/false, hoverLowerEdgeFader.getValue());
 }
 
 void BandView::paintBar(juce::Graphics& g, juce::Rectangle<float> rect,
-                        bool isUpper, float hoverEdgeAlpha, float hoverBodyAlpha) const
+                        bool isUpper, float hoverBodyAlpha) const
 {
     if (rect.getHeight() < 1.0f)
         return;
     paintBarFill(g, rect, isUpper);
     paintRatioStripes(g, rect, isUpper, hoverBodyAlpha);
-    paintHoverEdge(g, rect, isUpper, hoverEdgeAlpha);
 }
 
 void BandView::paintBarFill(juce::Graphics& g, juce::Rectangle<float> rect, bool isUpper) const
@@ -124,9 +127,6 @@ void BandView::paintBarFill(juce::Graphics& g, juce::Rectangle<float> rect, bool
     const auto& pal   = theme.palette();
     const float ratio = isUpper ? upperRatio : lowerRatio;
 
-    // Upper bar is grey when its ratio is ~0 (no compression). Lower bar uses
-    // the dark "downward" colour when ratio > 0 (upward compression) and the
-    // light "upward" colour at zero or below (expander mode).
     juce::Colour fill;
     if (isUpper)
         fill = (ratio < kRatioActiveEpsilon) ? pal.barFillDisabled : pal.barFillUpper;
@@ -149,8 +149,6 @@ void BandView::paintRatioStripes(juce::Graphics& g, juce::Rectangle<float> rect,
     const float dbRange = BaseMetrics::kMaxDb - BaseMetrics::kMinDb;
     const float dbStep  = dbRange / static_cast<float>(kDbSections);
 
-    // Pick the first dB-grid step outside the threshold; subsequent stripes
-    // step further away (upwards in dB for the upper bar, downwards for the lower).
     const float gridPos    = static_cast<float>(kDbSections) * (threshold - BaseMetrics::kMinDb) / dbRange;
     const int   gridIndex0 = isUpper ? static_cast<int>(std::ceil(gridPos))
                                      : static_cast<int>(std::floor(gridPos));
@@ -169,18 +167,13 @@ void BandView::paintRatioStripes(juce::Graphics& g, juce::Rectangle<float> rect,
     float inputDb = static_cast<float>(gridIndex0) * dbStep + BaseMetrics::kMinDb;
     for (int i = 0; i < kRatioDbLines; ++i)
     {
-        // Vital's compressed-dB curve: stripes interpolate from input-dB
-        // towards the threshold by the ratio amount.
         const float compressedDb = inputDb + ratio * (threshold - inputDb);
         const float yIdeal       = area.getY()
                                  + (BaseMetrics::kMaxDb - compressedDb) / dbRange * area.getHeight();
 
-        // Keep the innermost stripe one pixel away from the threshold edge so
-        // the hover indicator and the stripe pile-up don't visually merge.
         const float yClamped = isUpper ? juce::jmin(yIdeal, pileLimit - kStripeHeight)
                                        : juce::jmax(yIdeal, pileLimit + kStripeHeight);
 
-        // Each stripe sits fully inside its bar (above y for upper, below for lower).
         const float yTopRaw = isUpper ? (yClamped - kStripeHeight) : yClamped;
         const float yBotRaw = isUpper ? yClamped : (yClamped + kStripeHeight);
         const float yTop    = juce::jmax(yTopRaw, rect.getY());
@@ -208,6 +201,65 @@ void BandView::paintHoverEdge(juce::Graphics& g, juce::Rectangle<float> rect, bo
         g.fillRect(rect.getX(), rect.getBottom() - kHoverEdgeHeight, rect.getWidth(), kHoverEdgeHeight);
     else
         g.fillRect(rect.getX(), rect.getY(), rect.getWidth(), kHoverEdgeHeight);
+}
+
+void BandView::paintMeters(juce::Graphics& g) const
+{
+    const auto area = contentArea();
+    if (area.getHeight() <= 1.0f)
+        return;
+
+    const float centreX = area.getCentreX();
+    const float barW    = theme.scaled(kMeterBarWidth);
+    const float gap     = theme.scaled(kMeterChannelGap);
+    const float leftX   = centreX - barW - gap * 0.5f;
+    const float rightX  = centreX + gap * 0.5f;
+    const float lineH   = juce::jmax(1.0f, theme.scaled(kMeterInputLineHeight));
+
+    g.setColour(theme.palette().meter);
+
+    const auto drawChannel = [&](float xLeft, float outputDb, float inputDb)
+    {
+        if (outputDb > BaseMetrics::kMinDb + 0.01f)
+        {
+            const float yTop = dbToY(outputDb);
+            const float h    = juce::jmax(0.0f, area.getBottom() - yTop);
+            if (h > 0.0f)
+                g.fillRect(xLeft, yTop, barW, h);
+        }
+        if (inputDb > BaseMetrics::kMinDb + 0.01f)
+        {
+            const float yLine = dbToY(inputDb);
+            g.fillRect(xLeft, yLine - lineH * 0.5f, barW, lineH);
+        }
+    };
+
+    drawChannel(leftX,  outputLeftDb,  inputLeftDb);
+    drawChannel(rightX, outputRightDb, inputRightDb);
+}
+
+void BandView::setInputLevels(float leftDb, float rightDb)
+{
+    const float l = juce::jlimit(BaseMetrics::kMinDb, BaseMetrics::kMaxDb, leftDb);
+    const float r = juce::jlimit(BaseMetrics::kMinDb, BaseMetrics::kMaxDb, rightDb);
+    if (l != inputLeftDb || r != inputRightDb)
+    {
+        inputLeftDb  = l;
+        inputRightDb = r;
+        repaint();
+    }
+}
+
+void BandView::setOutputLevels(float leftDb, float rightDb)
+{
+    const float l = juce::jlimit(BaseMetrics::kMinDb, BaseMetrics::kMaxDb, leftDb);
+    const float r = juce::jlimit(BaseMetrics::kMinDb, BaseMetrics::kMaxDb, rightDb);
+    if (l != outputLeftDb || r != outputRightDb)
+    {
+        outputLeftDb  = l;
+        outputRightDb = r;
+        repaint();
+    }
 }
 
 //==============================================================================
@@ -414,8 +466,6 @@ void BandView::mouseUp(const juce::MouseEvent& e)
             break;
     }
 
-    // After a threshold drag the cursor should reappear on the (new) threshold
-    // line so the user can immediately interact with it again.
     std::optional<juce::Point<float>> restoreOverride;
     if (activeZone == HitZone::UpperEdge || activeZone == HitZone::LowerEdge)
     {
@@ -431,7 +481,7 @@ void BandView::mouseUp(const juce::MouseEvent& e)
 }
 
 //==============================================================================
-// Drag application (handles coupling and host notification)
+// Drag application
 
 void BandView::applyUpperThreshold(float v)
 {
@@ -439,7 +489,6 @@ void BandView::applyUpperThreshold(float v)
     upperThreshold = v;
     if (onParamChange) onParamChange(paramIds.upperThreshold, v);
 
-    // Couple: upper must stay above lower. Push lower down with us.
     if (v < lowerThreshold)
     {
         lowerThresholdAttach.setValueAsPartOfGesture(v);
@@ -454,7 +503,6 @@ void BandView::applyLowerThreshold(float v)
     lowerThreshold = v;
     if (onParamChange) onParamChange(paramIds.lowerThreshold, v);
 
-    // Couple: lower must stay below upper. Push upper up with us.
     if (v > upperThreshold)
     {
         upperThresholdAttach.setValueAsPartOfGesture(v);

@@ -18,6 +18,8 @@
 
 #include "PluginEditor.h"
 
+#include <cmath>
+
 namespace vitottx
 {
 
@@ -36,24 +38,27 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
       processor(p),
       lowBand (p.getAPVTS(), theme, makeIds("low")),
       midBand (p.getAPVTS(), theme, makeIds("band")),
-      highBand(p.getAPVTS(), theme, makeIds("high"))
+      highBand(p.getAPVTS(), theme, makeIds("high")),
+      mixKnob    (theme),
+      lowKnob    (theme),
+      bandKnob   (theme),
+      highKnob   (theme),
+      attackKnob (theme),
+      releaseKnob(theme)
 {
     addAndMakeVisible(lowBand);
     addAndMakeVisible(midBand);
     addAndMakeVisible(highBand);
 
-    hint.setColour(juce::Label::backgroundColourId, juce::Colour::fromFloatRGBA(0.0f, 0.0f, 0.0f, 0.55f));
-    hint.setColour(juce::Label::textColourId, theme.palette().textPrimary);
-    hint.setJustificationType(juce::Justification::centred);
-    hint.setInterceptsMouseClicks(false, false);
-    addAndMakeVisible(hint);
+    setupKnob(mixKnob,     "mix",      "MIX");
+    setupKnob(lowKnob,     "lgain",    "LOW");
+    setupKnob(bandKnob,    "mgain",    "BAND");
+    setupKnob(highKnob,    "hgain",    "HIGH");
+    setupKnob(attackKnob,  "att_time", "ATTACK");
+    setupKnob(releaseKnob, "rel_time", "RELEASE");
 
-    auto bind = [this](BandView& b) {
-        b.onParamChange = [this](const juce::String& id, float v) { showParam(id, v); };
-    };
-    bind(lowBand);
-    bind(midBand);
-    bind(highBand);
+    for (auto* k : { &mixKnob, &lowKnob, &bandKnob, &highKnob, &attackKnob, &releaseKnob })
+        addAndMakeVisible(*k);
 
     setResizable(true, true);
     setResizeLimits(BaseMetrics::kReferenceWidth,
@@ -64,6 +69,8 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
         c->setFixedAspectRatio((double) BaseMetrics::kReferenceWidth
                                / (double) BaseMetrics::kReferenceHeight);
     setSize(BaseMetrics::kReferenceWidth, BaseMetrics::kReferenceHeight);
+
+    startTimerHz(30);
 }
 
 VitOttAudioProcessorEditor::~VitOttAudioProcessorEditor() = default;
@@ -76,8 +83,6 @@ void VitOttAudioProcessorEditor::paint(juce::Graphics& g)
     const float r = (float) theme.panelCornerRadius();
     g.setColour(theme.palette().panel);
     g.fillRoundedRectangle(bounds, r);
-    g.setColour(theme.palette().panelOutline);
-    g.drawRoundedRectangle(bounds.reduced(theme.panelOutlineWidth() * 0.5f), r, theme.panelOutlineWidth());
 }
 
 void VitOttAudioProcessorEditor::resized()
@@ -86,34 +91,109 @@ void VitOttAudioProcessorEditor::resized()
     const float yScale = (float) getHeight() / (float) BaseMetrics::kReferenceHeight;
     theme.setScale(juce::jmin(xScale, yScale));
 
-    auto area = getLocalBounds().reduced(theme.padding());
-    const int hintH = theme.labelHeight() + theme.smallPadding();
-    hint.setBounds(area.removeFromBottom(hintH));
-    hint.setFont(juce::FontOptions(theme.fontValue()));
-    area.removeFromBottom(theme.smallPadding());
+    const int outerPadding = theme.scaledInt(10);
+    const int gap          = theme.scaledInt(10);
+    const int knobSlot     = theme.scaledInt(60);
 
-    area.removeFromLeft(theme.scaledInt(BaseMetrics::kLeftSectionWidth));
-    area.removeFromRight(theme.scaledInt(BaseMetrics::kRightSectionWidth));
+    const int leftSectionWidth  = 3 * knobSlot + 2 * gap;
+    const int rightSectionWidth = knobSlot;
 
-    panelBounds = area;
+    auto area = getLocalBounds().reduced(outerPadding);
+    auto leftArea  = area.removeFromLeft (leftSectionWidth);   area.removeFromLeft (gap);
+    auto rightArea = area.removeFromRight(rightSectionWidth);  area.removeFromRight(gap);
+    auto bandsArea = area;
 
-    auto inner = area.reduced(theme.smallPadding());
-    const int gap = juce::jmax(2, theme.smallPadding() / 2);
-    const int totalGap  = gap * 2;
-    const int bandWidth = (inner.getWidth() - totalGap) / 3;
+    panelBounds = bandsArea;
 
-    lowBand .setBounds(inner.removeFromLeft(bandWidth));
-    inner.removeFromLeft(gap);
-    midBand .setBounds(inner.removeFromLeft(bandWidth));
-    inner.removeFromLeft(gap);
-    highBand.setBounds(inner);
+    layoutLeftSection (leftArea);
+    layoutRightSection(rightArea);
+
+    using juce::FlexBox;
+    using juce::FlexItem;
+
+    const int bandsPadding = theme.scaledInt(16);
+    auto bandsInner = bandsArea.reduced(bandsPadding, 0);
+
+    FlexBox bands;
+    bands.flexDirection = FlexBox::Direction::row;
+    bands.items.add(FlexItem(lowBand ).withFlex(1.0f).withMargin({ 0, (float) bandsPadding, 0, 0 }));
+    bands.items.add(FlexItem(midBand ).withFlex(1.0f).withMargin({ 0, (float) bandsPadding, 0, 0 }));
+    bands.items.add(FlexItem(highBand).withFlex(1.0f));
+    bands.performLayout(bandsInner.toFloat());
 }
 
-void VitOttAudioProcessorEditor::showParam(const juce::String& id, float value)
+void VitOttAudioProcessorEditor::setupKnob(Knob& slot,
+                                           const char* paramId,
+                                           const juce::String& caption)
 {
-    auto* p = processor.getAPVTS().getParameter(id);
-    const juce::String name = (p != nullptr) ? p->getName(64) : id;
-    hint.setText(name + " = " + juce::String(value, 2), juce::dontSendNotification);
+    slot.setCaption(caption);
+    slot.attachTo(processor.getAPVTS(), paramId);
+}
+
+void VitOttAudioProcessorEditor::layoutLeftSection(juce::Rectangle<int> area)
+{
+    using juce::FlexBox;
+    using juce::FlexItem;
+
+    const int gap = theme.scaledInt(10);
+    const int topRowDrop = theme.scaledInt(5);
+    const int rowH = (area.getHeight() - gap) / 2;
+    auto topRow = area.removeFromTop(rowH);
+    topRow.removeFromTop(topRowDrop);
+    area.removeFromTop(gap);
+    auto botRow = area;
+
+    FlexBox top;
+    top.flexDirection = FlexBox::Direction::row;
+    top.items.add(FlexItem().withFlex(1.0f).withMargin({ 0, (float) gap, 0, 0 }));
+    top.items.add(FlexItem().withFlex(1.0f).withMargin({ 0, (float) gap, 0, 0 }));
+    top.items.add(FlexItem(mixKnob).withFlex(1.0f));
+    top.performLayout(topRow.toFloat());
+
+    FlexBox bot;
+    bot.flexDirection = FlexBox::Direction::row;
+    bot.items.add(FlexItem(lowKnob ).withFlex(1.0f).withMargin({ 0, (float) gap, 0, 0 }));
+    bot.items.add(FlexItem(bandKnob).withFlex(1.0f).withMargin({ 0, (float) gap, 0, 0 }));
+    bot.items.add(FlexItem(highKnob).withFlex(1.0f));
+    bot.performLayout(botRow.toFloat());
+}
+
+void VitOttAudioProcessorEditor::layoutRightSection(juce::Rectangle<int> area)
+{
+    using juce::FlexBox;
+    using juce::FlexItem;
+
+    const int gap = theme.scaledInt(10);
+    const int topRowDrop = theme.scaledInt(5);
+    area.removeFromTop(topRowDrop);
+
+    FlexBox col;
+    col.flexDirection = FlexBox::Direction::column;
+    col.items.add(FlexItem(attackKnob ).withFlex(1.0f).withMargin({ 0, 0, (float) gap, 0 }));
+    col.items.add(FlexItem(releaseKnob).withFlex(1.0f));
+    col.performLayout(area.toFloat());
+}
+
+void VitOttAudioProcessorEditor::timerCallback()
+{
+    static constexpr float kMsFloor = 1.0e-8f; // ~-80 dB
+
+    const auto msToDb = [](float ms) -> float
+    {
+        return 10.0f * std::log10(juce::jmax(kMsFloor, ms));
+    };
+
+    const auto pushBand = [&](BandView& band, int bandIndex)
+    {
+        band.setInputLevels (msToDb(processor.getInputMeanSquared (bandIndex, 0)),
+                             msToDb(processor.getInputMeanSquared (bandIndex, 1)));
+        band.setOutputLevels(msToDb(processor.getOutputMeanSquared(bandIndex, 0)),
+                             msToDb(processor.getOutputMeanSquared(bandIndex, 1)));
+    };
+
+    pushBand(lowBand,  0);
+    pushBand(midBand,  1);
+    pushBand(highBand, 2);
 }
 
 } // namespace vitottx

@@ -20,12 +20,14 @@
 
 #include "PluginProcessor.h"
 #include "ui/BandView.h"
+#include "ui/Knob.h"
 #include "ui/Theme.h"
 
 namespace vitottx
 {
 
-class VitOttAudioProcessorEditor : public juce::AudioProcessorEditor
+class VitOttAudioProcessorEditor : public juce::AudioProcessorEditor,
+                                   private juce::Timer
 {
 public:
     explicit VitOttAudioProcessorEditor(VitOttAudioProcessor&);
@@ -35,6 +37,9 @@ public:
     void resized() override;
 
 private:
+    void timerCallback() override;
+
+
     VitOttAudioProcessor& processor;
 
     Theme    theme;
@@ -42,9 +47,18 @@ private:
     BandView midBand;
     BandView highBand;
 
-    juce::Label hint;
     juce::Rectangle<int> panelBounds;
-    void showParam(const juce::String& id, float value);
+
+    Knob mixKnob;
+    Knob lowKnob;
+    Knob bandKnob;
+    Knob highKnob;
+    Knob attackKnob;
+    Knob releaseKnob;
+
+    void setupKnob(Knob& slot, const char* paramId, const juce::String& caption);
+    void layoutLeftSection (juce::Rectangle<int> area);
+    void layoutRightSection(juce::Rectangle<int> area);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VitOttAudioProcessorEditor)
 };

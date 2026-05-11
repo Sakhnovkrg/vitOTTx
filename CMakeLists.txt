@@ -51,6 +51,8 @@ target_sources(${PLUGIN_NAME} PRIVATE
     Source/ui/HoverFader.h
     Source/ui/BandView.h
     Source/ui/BandView.cpp
+    Source/ui/Knob.h
+    Source/ui/Knob.cpp
 
     Source/vital_dsp/compressor.cpp
     Source/vital_dsp/compressor.h

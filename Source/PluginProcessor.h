@@ -18,6 +18,7 @@
 
 #include <JuceHeader.h>
 #include <array>
+#include <atomic>
 #include "vital_dsp/compressor.h"
 #include "vital_dsp/framework/value.h"
 
@@ -72,6 +73,19 @@ public:
 
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return parameters; }
 
+    // Real-time meter readouts (mean-squared per band, per stereo channel).
+    // Updated from the audio thread, read by the GUI via a polling timer.
+    // Index order: 0 = low, 1 = mid, 2 = high.
+    float getInputMeanSquared(int bandIndex, int channel) const noexcept
+    {
+        return inputMeanSquared[bandIndex][channel].load(std::memory_order_relaxed);
+    }
+
+    float getOutputMeanSquared(int bandIndex, int channel) const noexcept
+    {
+        return outputMeanSquared[bandIndex][channel].load(std::memory_order_relaxed);
+    }
+
 private:
     //==============================================================================
 
@@ -82,6 +96,9 @@ private:
     std::array <vital::Value*, 21> vals = {};
 
     double in_gain = 1.0f, out_gain = 1.0f;
+
+    std::atomic<float> inputMeanSquared [3][2] {}; // [band][channel]
+    std::atomic<float> outputMeanSquared[3][2] {}; // [band][channel]
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VitOttAudioProcessor)
 };

@@ -286,7 +286,18 @@ void VitOttAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
 
         sample_offset += num_samples;
     }
-     
+
+    const auto storeMs = [](std::atomic<float> (&target)[2], vital::poly_float ms)
+    {
+        target[0].store(ms[0], std::memory_order_relaxed);
+        target[1].store(ms[1], std::memory_order_relaxed);
+    };
+    storeMs(inputMeanSquared [0], comp->output(vital::MultibandCompressor::kLowInputMeanSquared )->buffer[0]);
+    storeMs(inputMeanSquared [1], comp->output(vital::MultibandCompressor::kBandInputMeanSquared)->buffer[0]);
+    storeMs(inputMeanSquared [2], comp->output(vital::MultibandCompressor::kHighInputMeanSquared)->buffer[0]);
+    storeMs(outputMeanSquared[0], comp->output(vital::MultibandCompressor::kLowOutputMeanSquared)->buffer[0]);
+    storeMs(outputMeanSquared[1], comp->output(vital::MultibandCompressor::kBandOutputMeanSquared)->buffer[0]);
+    storeMs(outputMeanSquared[2], comp->output(vital::MultibandCompressor::kHighOutputMeanSquared)->buffer[0]);
 }
 void VitOttAudioProcessor::readAudio(vital::poly_float* comp_buf, juce::AudioSampleBuffer* buffer, int channels, int samples, int offset) {
 
