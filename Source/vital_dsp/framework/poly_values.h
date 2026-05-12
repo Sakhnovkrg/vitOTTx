@@ -20,15 +20,13 @@
 #include <climits>
 #include <cstdlib>
 
-#define __SSE2__ 1
-
 #if VITAL_AVX2
   #define VITAL_AVX2 1
   static_assert(false, "AVX2 is not supported yet.");
-#elif __SSE2__
-  #define VITAL_SSE2 1
 #elif defined(__ARM_NEON__) || defined(__ARM_NEON)
   #define VITAL_NEON 1
+#elif defined(__SSE2__) || defined(_M_X64) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2)
+  #define VITAL_SSE2 1
 #else
   static_assert(false, "No SIMD Intrinsics found which are necessary for compilation");
 #endif

@@ -53,8 +53,8 @@ public:
         g.setColour(pal.sidebar);
         g.fillRect(sidebar);
 
-        const auto titleColour = juce::Colours::white.withAlpha(0.55f)
-                                     .interpolatedWith(pal.meter, fader.getValue());
+        const auto titleColour = pal.sidebar.overlaidWith(
+            juce::Colours::white.withAlpha(0.55f).interpolatedWith(pal.meter, fader.getValue()));
 
         const auto drawRotated = [&](const juce::String& text,
                                      juce::Font font,
@@ -89,7 +89,7 @@ public:
 
         drawRotated(versionText,
                     versionFont(),
-                    juce::Colours::white.withAlpha(0.3f),
+                    pal.sidebar.overlaidWith(juce::Colours::white.withAlpha(0.3f)),
                     sidebar.getBottom() - theme.scaled((float) BaseMetrics::kSidebarVersionBottomGap),
                     juce::Justification::centredLeft,
                     juce::jmax(0, (int) sidebar.getHeight() - 2 * sidebarTextGap));
