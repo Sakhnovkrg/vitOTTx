@@ -12,8 +12,6 @@ A cross-platform multiband compressor audio plugin (VST3 / AU / LV2).
 2. Edit `config.bat` — point the variables at your local Visual Studio Build Tools / CMake / Ninja.
 3. `build.bat` (Debug) or `build.bat Release`.
 
-Artifacts land in `build\vitOTTx_artefacts\<Config>\`.
-
 ## Building (macOS)
 
 1. `./init.sh` — installs CMake/Ninja via Homebrew and initializes the JUCE submodule.
@@ -22,7 +20,15 @@ Artifacts land in `build\vitOTTx_artefacts\<Config>\`.
 
 ## Building (Linux)
 
-1. Install `cmake`, `ninja-build` and a C++17 toolchain via your package manager.
+1. Install the build toolchain and JUCE's runtime dev libraries (Debian/Ubuntu):
+
+   ```
+   sudo apt install build-essential cmake ninja-build \
+       libx11-dev libfreetype-dev libfontconfig1-dev libasound2-dev \
+       libxrandr-dev libxinerama-dev libxcursor-dev \
+       libgl1-mesa-dev libglu1-mesa-dev
+   ```
+
 2. `./build.sh` (Debug) or `./build.sh Release` — submodules are initialized automatically (shallow clone).
 
 ## License
