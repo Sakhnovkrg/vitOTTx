@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>__PLUGIN_NAME__</title>
+    <organization>__BUNDLE_ID__</organization>
+
+    <!-- Allow install for current user (~/Library) or system-wide (/Library). -->
+    <domains enable_anywhere="false" enable_currentUserHome="true" enable_localSystem="true"/>
+
+    <!-- customize="always" forces the format selection panel. -->
+    <options customize="always" require-scripts="false" hostArchitectures="x86_64,arm64"/>
+
+    <choices-outline>
+        <line choice="default">
+            <line choice="vst3"/>
+            <line choice="au"/>
+        </line>
+    </choices-outline>
+
+    <choice id="default" title="__PLUGIN_NAME__"/>
+
+    <choice id="vst3"
+            title="VST3"
+            description="Installs the VST3 plug-in to /Library/Audio/Plug-Ins/VST3 (or ~/Library/Audio/Plug-Ins/VST3 when installing for current user only)."
+            visible="true"
+            start_selected="true">
+        <pkg-ref id="__BUNDLE_ID__.vst3"/>
+    </choice>
+
+    <choice id="au"
+            title="Audio Unit"
+            description="Installs the AU plug-in to /Library/Audio/Plug-Ins/Components (or ~/Library/Audio/Plug-Ins/Components when installing for current user only)."
+            visible="true"
+            start_selected="true">
+        <pkg-ref id="__BUNDLE_ID__.au"/>
+    </choice>
+
+    <pkg-ref id="__BUNDLE_ID__.vst3" version="__VERSION__" auth="root" onConclusion="none">__PLUGIN_NAME__-VST3.pkg</pkg-ref>
+    <pkg-ref id="__BUNDLE_ID__.au"   version="__VERSION__" auth="root" onConclusion="none">__PLUGIN_NAME__-AU.pkg</pkg-ref>
+</installer-gui-script>

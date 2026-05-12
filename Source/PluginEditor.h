@@ -19,6 +19,7 @@
 #pragma once
 
 #include "PluginProcessor.h"
+#include "Settings.h"
 #include "ui/BandView.h"
 #include "ui/BypassButton.h"
 #include "ui/BypassOverlay.h"
@@ -70,6 +71,7 @@ private:
     BypassOverlay bypassOverlay;
     TooltipReadout readout;
     bool lastBypassState = false;
+    bool persistSize     = false;
 
     static constexpr int kBypassFadeMs = 180;
 

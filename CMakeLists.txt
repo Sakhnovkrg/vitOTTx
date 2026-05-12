@@ -45,6 +45,8 @@ target_sources(${PLUGIN_NAME} PRIVATE
     Source/PluginProcessor.h
     Source/PluginEditor.h
     Source/PluginEditor.cpp
+    Source/Settings.h
+    Source/Settings.cpp
 
     Source/ui/Theme.h
     Source/ui/HiddenCursorDrag.h

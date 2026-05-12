@@ -1,0 +1,381 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Generate Build Files
+        run: |
+          cmake -G "Visual Studio 17 2022" -DCMAKE_BUILD_TYPE=Release -S . -B ./build
+
+      - name: Build Project
+        run: |
+          cmake --build ./build --config Release
+
+      - name: List errors
+        run: |
+          if exist .\build\CMakeFiles\CMakeError.log type .\build\CMakeFiles\CMakeError.log
+        shell: cmd
+
+      - name: Find VST3 binary and version
+        id: vst3
+        run: |
+          $vst3 = Get-ChildItem -Path ./build/vitOTTx_artefacts/Release/VST3 -Filter "*.vst3" -Recurse -File | Select-Object -First 1
+          echo "path=$($vst3.FullName)" >> $env:GITHUB_OUTPUT
+          $version = (Select-String -Path config.cmake -Pattern 'set\(PLUGIN_VERSION "(\S+)"\)').Matches.Groups[1].Value
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Build installer
+        run: |
+          iscc /DAPP_VERSION="${{ steps.vst3.outputs.version }}" /DVST3_PATH="${{ steps.vst3.outputs.path }}" installer/vitottx.iss
+        shell: cmd
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitottx-win
+          path: |
+            ./build/vitOTTx_artefacts/Release/VST3
+            !./build/vitOTTx_artefacts/Release/VST3/*.exp
+            !./build/vitOTTx_artefacts/Release/VST3/*.lib
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitottx-win-installer
+          path: installer/Output/vitOTTx-Setup.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: brew install cmake ninja
+
+      - name: Generate Build Files
+        run: |
+          cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64" -S . -B ./build
+
+      - name: Build Project
+        run: |
+          cmake --build ./build --config Release
+
+      - name: List build output
+        run: |
+          echo "=== Build artifacts ==="
+          ls -la ./build/vitOTTx_artefacts/Release/ || true
+          echo "=== AU ==="
+          ls -la ./build/vitOTTx_artefacts/Release/AU/ || true
+          echo "=== VST3 ==="
+          ls -la ./build/vitOTTx_artefacts/Release/VST3/ || true
+
+      - name: List errors
+        run: cat "./build/CMakeFiles/CMakeError.log" || true
+
+      - name: Read plugin metadata
+        id: meta
+        run: |
+          VERSION=$(grep -E '^set\(PLUGIN_VERSION ' config.cmake | sed -E 's/.*"([^"]+)".*/\1/')
+          PLUGIN_NAME=$(grep -E '^set\(PLUGIN_NAME ' config.cmake | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "plugin_name=$PLUGIN_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Import signing certificates
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          MACOS_INSTALLER_CERTIFICATE: ${{ secrets.MACOS_INSTALLER_CERTIFICATE }}
+          MACOS_INSTALLER_CERT_PASSWORD: ${{ secrets.MACOS_INSTALLER_CERT_PASSWORD }}
+        run: |
+          security create-keychain -p actions build.keychain
+          security default-keychain -s build.keychain
+          # Add to user search list — productbuild/codesign look up identities
+          # via the search list, not the default-keychain setting.
+          security list-keychains -d user -s build.keychain login.keychain
+          security unlock-keychain -p actions build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+
+          # Developer ID Application — for codesigning bundles
+          echo "$MACOS_CERTIFICATE" | base64 --decode > app_cert.p12
+          security import app_cert.p12 -k build.keychain -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+          rm app_cert.p12
+
+          # Developer ID Installer — for productbuild --sign.
+          # -A: any tool can use the key without prompting. Safe here because
+          # the keychain is ephemeral and lives only in this runner.
+          if [ -n "$MACOS_INSTALLER_CERTIFICATE" ]; then
+            echo "$MACOS_INSTALLER_CERTIFICATE" | base64 --decode > installer_cert.p12
+            security import installer_cert.p12 -k build.keychain -P "$MACOS_INSTALLER_CERT_PASSWORD" -A
+            rm installer_cert.p12
+          fi
+
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
+
+          echo "Codesigning identities:"
+          security find-identity -v -p codesigning build.keychain
+          echo "All identities:"
+          security find-identity -v build.keychain
+
+      - name: Sign plugins
+        id: sign
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          APP_IDENTITY=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          echo "Using identity: $APP_IDENTITY"
+          if [ -z "$APP_IDENTITY" ]; then
+            echo "Error: No Developer ID Application identity found"
+            exit 1
+          fi
+
+          VST3_BUNDLE=$(find ./build/vitOTTx_artefacts/Release/VST3 -name "*.vst3" -type d | head -1 || true)
+          AU_BUNDLE=$(find ./build/vitOTTx_artefacts/Release/AU -name "*.component" -type d | head -1 || true)
+
+          if [ -n "$VST3_BUNDLE" ]; then
+            codesign --force --deep --options runtime --timestamp \
+              --sign "$APP_IDENTITY" "$VST3_BUNDLE"
+            codesign --verify --verbose "$VST3_BUNDLE"
+            echo "Signed VST3: $VST3_BUNDLE"
+          fi
+
+          if [ -n "$AU_BUNDLE" ]; then
+            codesign --force --deep --options runtime --timestamp \
+              --sign "$APP_IDENTITY" "$AU_BUNDLE"
+            codesign --verify --verbose "$AU_BUNDLE"
+            echo "Signed AU: $AU_BUNDLE"
+          fi
+
+          echo "vst3_bundle=$VST3_BUNDLE" >> "$GITHUB_OUTPUT"
+          echo "au_bundle=$AU_BUNDLE" >> "$GITHUB_OUTPUT"
+
+      - name: Submit plugin bundles for notarization
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          VST3_BUNDLE: ${{ steps.sign.outputs.vst3_bundle }}
+          AU_BUNDLE: ${{ steps.sign.outputs.au_bundle }}
+        run: |
+          # Fire-and-forget: don't burn CI minutes waiting for the ticket.
+          # Bundles ship signed; Gatekeeper fetches the notarization ticket
+          # online on first launch.
+          notarize() {
+            local bundle="$1"
+            [ -z "$bundle" ] && return 0
+            local zip_path="${bundle##*/}.zip"
+            ditto -c -k --keepParent "$bundle" "$zip_path"
+            xcrun notarytool submit "$zip_path" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID"
+            rm "$zip_path"
+          }
+
+          notarize "$VST3_BUNDLE"
+          notarize "$AU_BUNDLE"
+
+      - name: Install rcodesign
+        run: |
+          # Prebuilt binary from indygreg/apple-platform-rs releases.
+          # No homebrew formula exists in core; cargo install is too slow.
+          RCODESIGN_VERSION=0.29.0
+          ARCH=$(uname -m)
+          [ "$ARCH" = "arm64" ] && ARCH=aarch64
+          URL="https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${RCODESIGN_VERSION}/apple-codesign-${RCODESIGN_VERSION}-${ARCH}-apple-darwin.tar.gz"
+          curl -fL "$URL" -o /tmp/rcodesign.tar.gz
+          tar -xzf /tmp/rcodesign.tar.gz -C /tmp
+          sudo install -m 0755 "/tmp/apple-codesign-${RCODESIGN_VERSION}-${ARCH}-apple-darwin/rcodesign" /usr/local/bin/rcodesign
+          rcodesign --version
+
+      - name: Build macOS .pkg installer
+        id: pkg
+        env:
+          VST3_BUNDLE: ${{ steps.sign.outputs.vst3_bundle }}
+          AU_BUNDLE: ${{ steps.sign.outputs.au_bundle }}
+          VERSION: ${{ steps.meta.outputs.version }}
+          PLUGIN_NAME: ${{ steps.meta.outputs.plugin_name }}
+          MACOS_INSTALLER_CERTIFICATE: ${{ secrets.MACOS_INSTALLER_CERTIFICATE }}
+          MACOS_INSTALLER_CERT_PASSWORD: ${{ secrets.MACOS_INSTALLER_CERT_PASSWORD }}
+        run: |
+          ./installer/macos/build_pkg.sh \
+            "$VERSION" \
+            "$VST3_BUNDLE" \
+            "$AU_BUNDLE" \
+            ./installer/macos/build
+
+          PKG_PATH="./installer/macos/build/$PLUGIN_NAME-$VERSION.pkg"
+
+          # Sign with rcodesign — bypasses keychain entirely. productbuild
+          # --sign / productsign hang on GitHub macos runners with no
+          # diagnostics; rcodesign reads the .p12 directly.
+          INSTALLER_P12=$(mktemp)
+          INSTALLER_PWD_FILE=$(mktemp)
+          trap 'rm -f "$INSTALLER_P12" "$INSTALLER_PWD_FILE"' EXIT
+          echo "$MACOS_INSTALLER_CERTIFICATE" | base64 --decode > "$INSTALLER_P12"
+          printf '%s' "$MACOS_INSTALLER_CERT_PASSWORD" > "$INSTALLER_PWD_FILE"
+
+          echo "[pkg] signing with rcodesign..."
+          rcodesign sign \
+            --p12-file "$INSTALLER_P12" \
+            --p12-password-file "$INSTALLER_PWD_FILE" \
+            "$PKG_PATH"
+          echo "[pkg] sign done"
+
+          pkgutil --check-signature "$PKG_PATH" | head -3
+
+          echo "pkg_path=$PKG_PATH" >> "$GITHUB_OUTPUT"
+          ls -la ./installer/macos/build/
+
+      - name: Submit .pkg for notarization
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PKG_PATH: ${{ steps.pkg.outputs.pkg_path }}
+        run: |
+          # Fire-and-forget. Pkg is signed with Developer ID Installer; the
+          # notarization ticket is fetched online by Gatekeeper. To staple it
+          # later run locally:
+          #   xcrun stapler staple <pkg>
+          xcrun notarytool submit "$PKG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID"
+
+      - name: Upload bundles
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitottx-macos
+          path: |
+            ./build/vitOTTx_artefacts/Release/AU
+            ./build/vitOTTx_artefacts/Release/VST3
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitottx-macos-installer
+          path: ${{ steps.pkg.outputs.pkg_path }}
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt-get install libx11-dev libfreetype-dev libfontconfig1-dev libasound2-dev libxrandr-dev libxinerama-dev libxcursor-dev libgl1-mesa-dev libglu1-mesa-dev
+
+      - name: Generate Build Files
+        run: |
+          cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -S . -B ./build
+
+      - name: Build Project
+        run: |
+          cmake --build ./build --config Release
+
+      - name: List errors
+        run: cat "./build/CMakeFiles/CMakeError.log" || true
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: vitottx-linux
+          path: |
+            ./build/vitOTTx_artefacts/Release/LV2
+            ./build/vitOTTx_artefacts/Release/VST3
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [build-windows, build-macos, build-linux]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vitottx-win
+          path: artifacts/vitottx-win
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: vitottx-win-installer
+          path: artifacts/vitottx-win-installer
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vitottx-macos
+          path: artifacts/vitottx-macos
+
+      - name: Download macOS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: vitottx-macos-installer
+          path: artifacts/vitottx-macos-installer
+
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vitottx-linux
+          path: artifacts/vitottx-linux
+
+      - name: Prepare release files
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+
+          # Windows: extract the actual .vst3 binary from the bundle.
+          # Filename stays "vitOTTx.vst3" across releases so DAW projects
+          # saved on an older version still resolve the plugin after upgrade.
+          find artifacts/vitottx-win -path "*/x86_64-win/*.vst3" -exec cp {} "artifacts/vitOTTx.vst3" \;
+
+          # Windows installer
+          cp artifacts/vitottx-win-installer/vitOTTx-Setup.exe "artifacts/vitOTTx-${TAG_NAME}-win-setup.exe"
+
+          # macOS: zip without extra folder nesting
+          cd artifacts/vitottx-macos
+          zip -r "../vitOTTx-${TAG_NAME}-macos.zip" .
+          cd ../..
+
+          # macOS installer (.pkg)
+          find artifacts/vitottx-macos-installer -name "*.pkg" -exec cp {} "artifacts/vitOTTx-${TAG_NAME}-macos.pkg" \;
+
+          # Linux: zip without extra folder nesting
+          cd artifacts/vitottx-linux
+          zip -r "../vitOTTx-${TAG_NAME}-linux.zip" .
+          cd ../..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          tag_name: ${{ github.ref_name }}
+          files: |
+            artifacts/vitOTTx.vst3
+            artifacts/vitOTTx-*-win-setup.exe
+            artifacts/vitOTTx-*-macos.zip
+            artifacts/vitOTTx-*-macos.pkg
+            artifacts/vitOTTx-*-linux.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

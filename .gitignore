@@ -1,6 +1,8 @@
 # Build
 build/
 build-xcode/
+installer/Output/
+installer/macos/build/
 
 # Local build config (paths to tools)
 config.bat

@@ -138,12 +138,29 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
     setResizable(true, true);
     setResizeLimits(BaseMetrics::kReferenceWidth,
                     BaseMetrics::kReferenceHeight,
-                    BaseMetrics::kReferenceWidth  * 3,
-                    BaseMetrics::kReferenceHeight * 3);
+                    BaseMetrics::kReferenceWidth  * 2,
+                    BaseMetrics::kReferenceHeight * 2);
+    const double aspect = (double) BaseMetrics::kReferenceWidth
+                        / (double) BaseMetrics::kReferenceHeight;
     if (auto* c = getConstrainer())
-        c->setFixedAspectRatio((double) BaseMetrics::kReferenceWidth
-                               / (double) BaseMetrics::kReferenceHeight);
-    setSize(BaseMetrics::kReferenceWidth, BaseMetrics::kReferenceHeight);
+        c->setFixedAspectRatio(aspect);
+
+    const int savedWidth  = juce::jlimit(BaseMetrics::kReferenceWidth,
+                                         BaseMetrics::kReferenceWidth * 2,
+                                         Settings::getEditorWidth(BaseMetrics::kReferenceWidth));
+    const int savedHeight = juce::roundToInt((double) savedWidth / aspect);
+    setSize(savedWidth, savedHeight);
+
+    juce::Component::SafePointer<VitOttAudioProcessorEditor> safe(this);
+    juce::MessageManager::callAsync([safe, savedWidth, savedHeight]() mutable
+    {
+        if (auto* self = safe.getComponent())
+        {
+            if (self->getWidth() != savedWidth || self->getHeight() != savedHeight)
+                self->setSize(savedWidth, savedHeight);
+            self->persistSize = true;
+        }
+    });
 
     startTimerHz(30);
 }
@@ -319,6 +336,9 @@ void VitOttAudioProcessorEditor::resized()
     highCrossHandle.setCounterpartCollapsed(lowCollapsed);
     highCrossHandle.setBounds(highHandleX - handleThickness / 2, bandsInner.getY(),
                               handleThickness, bandsInner.getHeight());
+
+    if (persistSize)
+        Settings::setEditorWidth(getWidth());
 }
 
 void VitOttAudioProcessorEditor::showReadout(const juce::String& name, const juce::String& value)
