@@ -73,6 +73,11 @@ public:
 
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return parameters; }
 
+    juce::AudioProcessorParameter* getBypassParameter() const override
+    {
+        return parameters.getParameter("bypass");
+    }
+
     // Real-time meter readouts (mean-squared per band, per stereo channel).
     // Updated from the audio thread, read by the GUI via a polling timer.
     // Index order: 0 = low, 1 = mid, 2 = high.

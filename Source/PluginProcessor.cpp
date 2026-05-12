@@ -29,6 +29,7 @@ VitOttAudioProcessor::VitOttAudioProcessor()
                      #endif
                        ), 
     parameters(*this, nullptr, juce::Identifier("vitOTT"), {
+            std::make_unique<juce::AudioParameterBool>("bypass", "Bypass", false),
             std::make_unique<juce::AudioParameterFloat>("in_gain", "In Gain", -60.0f, 30.0f, 0.0f),
             std::make_unique<juce::AudioParameterFloat>("out_gain", "Out Gain", -60.0f, 30.0f, 0.0f),
             std::make_unique<juce::AudioParameterFloat>("mix", "Mix", 0, 1.f, 1.0f),
@@ -281,7 +282,14 @@ void VitOttAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
 
     if (total_samples == 0)
         return;
-    
+
+    if (parameters.getRawParameterValue("bypass")->load() >= 0.5f)
+    {
+        for (auto& ch : inputMeanSquared)  for (auto& v : ch) v.store(0.0f, std::memory_order_relaxed);
+        for (auto& ch : outputMeanSquared) for (auto& v : ch) v.store(0.0f, std::memory_order_relaxed);
+        return;
+    }
+
     updParams();
     // transform buffer to L-R-L-R aligned simd buffer
 

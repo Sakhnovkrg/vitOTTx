@@ -75,6 +75,8 @@ struct BaseMetrics
     static constexpr int   kSidebarVersionFontSize = 10;
     static constexpr int   kSidebarShadowRadius   = 6;
     static constexpr int   kSidebarShadowOffset   = 2;
+    static constexpr int   kBypassButtonTopGap    = 10;
+    static constexpr int   kBypassButtonDiameter  = 14;
     static constexpr int   kReferenceWidth        = 640 + kSidebarWidth;
     static constexpr int   kReferenceHeight       = 180;
 };

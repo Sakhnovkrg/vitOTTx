@@ -48,7 +48,9 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
       attackKnob (theme),
       releaseKnob(theme),
       lowCrossHandle (p.getAPVTS(), theme, CrossoverHandle::Side::Low),
-      highCrossHandle(p.getAPVTS(), theme, CrossoverHandle::Side::High)
+      highCrossHandle(p.getAPVTS(), theme, CrossoverHandle::Side::High),
+      bypassButton(p.getAPVTS(), theme),
+      bypassOverlay(theme)
 {
     addAndMakeVisible(lowBand);
     addAndMakeVisible(midBand);
@@ -68,6 +70,24 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
 
     addAndMakeVisible(lowCrossHandle);
     addAndMakeVisible(highCrossHandle);
+    addAndMakeVisible(bypassOverlay);
+    bypassOverlay.setVisible(false);
+
+    addAndMakeVisible(bypassButton);
+    lastBypassState = bypassButton.isOn();
+
+    auto applyBypassUi = [this]()
+    {
+        const bool on = bypassButton.isOn();
+        bypassOverlay.setVisible(on);
+        if (on)
+        {
+            bypassOverlay.toFront(false);
+            bypassButton.toFront(false);
+        }
+    };
+    bypassButton.onToggled = applyBypassUi;
+    applyBypassUi();
     lowCrossHandle.onFreqChange  = [this]() { resized(); };
     highCrossHandle.onFreqChange = [this]() { resized(); };
 
@@ -166,6 +186,19 @@ void VitOttAudioProcessorEditor::resized()
     auto fullArea = getLocalBounds();
     const int sidebarW = theme.scaledInt(BaseMetrics::kSidebarWidth);
     sidebarBounds = fullArea.removeFromLeft(sidebarW);
+
+    const int btnD       = theme.scaledInt(BaseMetrics::kBypassButtonDiameter);
+    const int btnTopGap  = theme.scaledInt(BaseMetrics::kBypassButtonTopGap);
+    bypassButton.setBounds(sidebarBounds.getCentreX() - btnD / 2,
+                           sidebarBounds.getY() + btnTopGap,
+                           btnD, btnD);
+
+    bypassOverlay.setBounds(fullArea);
+    if (bypassOverlay.isVisible())
+    {
+        bypassOverlay.toFront(false);
+        bypassButton.toFront(false);
+    }
 
     auto area = fullArea.reduced(outerPadding);
     auto leftArea  = area.removeFromLeft (leftSectionWidth);   area.removeFromLeft (gap);
@@ -312,6 +345,19 @@ void VitOttAudioProcessorEditor::timerCallback()
     pushBand(lowBand,  0);
     pushBand(midBand,  1);
     pushBand(highBand, 2);
+
+    const bool bypassed = bypassButton.isOn();
+    if (bypassed != lastBypassState)
+    {
+        lastBypassState = bypassed;
+        bypassButton.repaint();
+        bypassOverlay.setVisible(bypassed);
+        if (bypassed)
+        {
+            bypassOverlay.toFront(false);
+            bypassButton.toFront(false);
+        }
+    }
 }
 
 } // namespace vitottx
