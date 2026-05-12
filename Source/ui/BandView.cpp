@@ -401,6 +401,8 @@ void BandView::mouseDown(const juce::MouseEvent& e)
     }
 
     drag.begin(*this, e.source);
+
+    emitReadoutForActiveZone();
 }
 
 void BandView::mouseDrag(const juce::MouseEvent& e)
@@ -442,6 +444,8 @@ void BandView::mouseDrag(const juce::MouseEvent& e)
         default:
             break;
     }
+
+    emitReadoutForActiveZone();
 }
 
 void BandView::mouseUp(const juce::MouseEvent& e)
@@ -478,6 +482,8 @@ void BandView::mouseUp(const juce::MouseEvent& e)
 
     activeZone = HitZone::None;
     updateCursor(hitTest(getMouseXYRelative()));
+
+    if (onHideReadout) onHideReadout();
 }
 
 //==============================================================================
@@ -515,6 +521,24 @@ void BandView::applyUpperRatio(float v)
 {
     upperRatioAttach.setValueAsPartOfGesture(v);
     if (onParamChange) onParamChange(paramIds.upperRatio, v);
+}
+
+void BandView::emitReadoutForActiveZone()
+{
+    if (!onShowReadout)
+        return;
+
+    const auto db  = [](float v) { return juce::String(v, 1) + " dB"; };
+    const auto pct = [](float v) { return juce::String(juce::roundToInt(v * 100.0f)) + " %"; };
+
+    switch (activeZone)
+    {
+        case HitZone::UpperEdge: onShowReadout("UPPER THRES", db(upperThreshold));  break;
+        case HitZone::LowerEdge: onShowReadout("LOWER THRES", db(lowerThreshold));  break;
+        case HitZone::UpperBody: onShowReadout("UPPER RATIO", pct(upperRatio));     break;
+        case HitZone::LowerBody: onShowReadout("LOWER RATIO", pct(lowerRatio));     break;
+        default: break;
+    }
 }
 
 void BandView::applyLowerRatio(float v)

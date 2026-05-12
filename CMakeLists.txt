@@ -55,6 +55,9 @@ target_sources(${PLUGIN_NAME} PRIVATE
     Source/ui/Knob.cpp
     Source/ui/CrossoverHandle.h
     Source/ui/CrossoverHandle.cpp
+    Source/ui/BypassButton.h
+    Source/ui/BypassOverlay.h
+    Source/ui/TooltipReadout.h
 
     Source/vital_dsp/compressor.cpp
     Source/vital_dsp/compressor.h

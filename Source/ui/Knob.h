@@ -36,6 +36,13 @@ public:
     void setCaption(const juce::String& text);
     void attachTo  (juce::AudioProcessorValueTreeState& apvts, const juce::String& paramId);
 
+    const juce::String& getCaption() const noexcept { return caption; }
+    juce::String formatValueText() const;
+    void setValueFormat(std::function<juce::String(double)> f) { valueFormatter = std::move(f); }
+
+    std::function<void(const juce::String&, const juce::String&)> onShowReadout;
+    std::function<void()> onHideReadout;
+
     void paint   (juce::Graphics&) override;
     void resized () override;
     bool hitTest (int x, int y) override;
@@ -58,6 +65,8 @@ private:
     bool  wasShift      = false;
 
     std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+    juce::RangedAudioParameter* parameter = nullptr;
+    std::function<juce::String(double)> valueFormatter;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Knob)
 };

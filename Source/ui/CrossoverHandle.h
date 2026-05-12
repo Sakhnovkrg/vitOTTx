@@ -48,9 +48,12 @@ public:
     void setRange(int leftX, int rightX);          // pixel extent in parent coords
     void setSnapMinimumWidth(int pixels);
     void setCounterpartX(int x);                   // x of the other crossover handle (-1 = none)
+    void setCounterpartCollapsed(bool collapsed);
     void setMinMidWidth(int pixels);               // min gap between this handle and counterpart
 
     std::function<void()> onFreqChange;
+    std::function<void(const juce::String&, const juce::String&)> onShowReadout;
+    std::function<void()> onHideReadout;
 
     float getFrequency() const noexcept { return currentFreq; }
 
@@ -65,6 +68,9 @@ public:
     static int   freqToX (float freq, int rangeLeft, int rangeRight) noexcept;
     static float xToFreq (float x,    int rangeLeft, int rangeRight) noexcept;
 
+    juce::String readoutName()  const;
+    juce::String readoutValue() const;
+
 private:
     const Theme& theme;
     Side side;
@@ -78,9 +84,10 @@ private:
     int   rangeLeft           = 0;
     int   rangeRight     = 0;
     int   snapMinWidth   = 30;
-    int   counterpartX   = -1;
-    int   minMidWidth    = 30;
-    bool  hovered        = false;
+    int   counterpartX           = -1;
+    bool  counterpartCollapsed   = false;
+    int   minMidWidth            = 30;
+    bool  hovered                = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (CrossoverHandle)
 };

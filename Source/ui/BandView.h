@@ -46,6 +46,8 @@ public:
     ~BandView() override;
 
     std::function<void(const juce::String& paramId, float value)> onParamChange;
+    std::function<void(const juce::String&, const juce::String&)> onShowReadout;
+    std::function<void()> onHideReadout;
 
     void setInputLevels (float leftDb, float rightDb);
     void setOutputLevels(float leftDb, float rightDb);
@@ -91,6 +93,8 @@ private:
     void applyLowerThreshold(float v);
     void applyUpperRatio    (float v);
     void applyLowerRatio    (float v);
+
+    void emitReadoutForActiveZone();
 
     const Theme& theme;
     ParamIds paramIds;

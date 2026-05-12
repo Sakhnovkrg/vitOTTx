@@ -68,6 +68,11 @@ void CrossoverHandle::setCounterpartX(int x)
     counterpartX = x;
 }
 
+void CrossoverHandle::setCounterpartCollapsed(bool collapsed)
+{
+    counterpartCollapsed = collapsed;
+}
+
 void CrossoverHandle::setMinMidWidth(int pixels)
 {
     minMidWidth = pixels;
@@ -107,12 +112,35 @@ void CrossoverHandle::mouseExit(const juce::MouseEvent&)
     if (hovered) { hovered = false; repaint(); }
 }
 
+static juce::String formatFreq(float hz)
+{
+    if (hz >= 1000.0f)
+        return juce::String(hz / 1000.0f, 2) + " kHz";
+    return juce::String(juce::roundToInt(hz)) + " Hz";
+}
+
+juce::String CrossoverHandle::readoutName() const
+{
+    if (counterpartCollapsed)
+        return "LOW / HIGH";
+    return side == Side::Low ? "LOW / MID" : "MID / HIGH";
+}
+
+juce::String CrossoverHandle::readoutValue() const
+{
+    if (side == Side::Low  && currentFreq <= CrossoverHandle::kMinFreq + 1.0f)  return "OFF";
+    if (side == Side::High && currentFreq >= CrossoverHandle::kMaxFreq - 50.0f) return "OFF";
+    return formatFreq(currentFreq);
+}
+
 void CrossoverHandle::mouseDown(const juce::MouseEvent& e)
 {
     dragStartFreq      = currentFreq;
     dragStartSourcePos = e.source.getScreenPosition();
     attach.beginGesture();
     drag.begin(*this, e.source);
+
+    if (onShowReadout) onShowReadout(readoutName(), readoutValue());
 }
 
 void CrossoverHandle::mouseDrag(const juce::MouseEvent& e)
@@ -168,6 +196,8 @@ void CrossoverHandle::mouseDrag(const juce::MouseEvent& e)
         if (onFreqChange) onFreqChange();
         repaint();
     }
+
+    if (onShowReadout) onShowReadout(readoutName(), readoutValue());
 }
 
 void CrossoverHandle::mouseUp(const juce::MouseEvent& e)
@@ -183,6 +213,8 @@ void CrossoverHandle::mouseUp(const juce::MouseEvent& e)
     // HiddenCursorDrag::end forces NormalCursor on the host; reinstate the
     // resize cursor so subsequent hovers show the correct affordance.
     setMouseCursor(juce::MouseCursor::LeftRightResizeCursor);
+
+    if (onHideReadout) onHideReadout();
 }
 
 } // namespace vitottx

@@ -50,7 +50,8 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
       lowCrossHandle (p.getAPVTS(), theme, CrossoverHandle::Side::Low),
       highCrossHandle(p.getAPVTS(), theme, CrossoverHandle::Side::High),
       bypassButton(p.getAPVTS(), theme),
-      bypassOverlay(theme)
+      bypassOverlay(theme),
+      readout(theme)
 {
     addAndMakeVisible(lowBand);
     addAndMakeVisible(midBand);
@@ -70,24 +71,67 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
 
     addAndMakeVisible(lowCrossHandle);
     addAndMakeVisible(highCrossHandle);
-    addAndMakeVisible(bypassOverlay);
-    bypassOverlay.setVisible(false);
+    addChildComponent(bypassOverlay);
+    bypassOverlay.setAlpha(0.0f);
 
     addAndMakeVisible(bypassButton);
     lastBypassState = bypassButton.isOn();
 
-    auto applyBypassUi = [this]()
+    auto applyBypassUi = [this](bool animated)
     {
         const bool on = bypassButton.isOn();
-        bypassOverlay.setVisible(on);
+        auto& animator = juce::Desktop::getInstance().getAnimator();
+
         if (on)
         {
+            bypassOverlay.setVisible(true);
             bypassOverlay.toFront(false);
             bypassButton.toFront(false);
+            if (animated)
+                animator.fadeIn(&bypassOverlay, kBypassFadeMs);
+            else
+                bypassOverlay.setAlpha(1.0f);
+        }
+        else
+        {
+            if (animated)
+                animator.fadeOut(&bypassOverlay, kBypassFadeMs);
+            else
+            {
+                bypassOverlay.setAlpha(0.0f);
+                bypassOverlay.setVisible(false);
+            }
         }
     };
-    bypassButton.onToggled = applyBypassUi;
-    applyBypassUi();
+    bypassButton.onToggled = [applyBypassUi]() { applyBypassUi(true); };
+    applyBypassUi(false);
+
+    addChildComponent(readout);
+
+    auto wireReadout = [this](auto& control)
+    {
+        control.onShowReadout = [this](const juce::String& n, const juce::String& v) { showReadout(n, v); };
+        control.onHideReadout = [this]() { hideReadout(); };
+    };
+    for (auto* k : { &inKnob, &outKnob, &mixKnob, &lowKnob, &bandKnob, &highKnob, &attackKnob, &releaseKnob })
+        wireReadout(*k);
+    wireReadout(lowCrossHandle);
+    wireReadout(highCrossHandle);
+    wireReadout(lowBand);
+    wireReadout(midBand);
+    wireReadout(highBand);
+
+    auto fmtDb  = [](double v) { return juce::String(v, 1) + " dB"; };
+    auto fmtPct = [](double v) { return juce::String(juce::roundToInt(v * 100.0)) + " %"; };
+
+    inKnob.setValueFormat(fmtDb);
+    outKnob.setValueFormat(fmtDb);
+    mixKnob.setValueFormat(fmtPct);
+    lowKnob.setValueFormat(fmtDb);
+    bandKnob.setValueFormat(fmtDb);
+    highKnob.setValueFormat(fmtDb);
+    attackKnob.setValueFormat(fmtPct);
+    releaseKnob.setValueFormat(fmtPct);
     lowCrossHandle.onFreqChange  = [this]() { resized(); };
     highCrossHandle.onFreqChange = [this]() { resized(); };
 
@@ -110,12 +154,15 @@ void VitOttAudioProcessorEditor::paint(juce::Graphics& g)
 {
     g.fillAll(theme.palette().background);
 
-    auto bounds = panelBounds.toFloat();
-    const float r = (float) theme.panelCornerRadius();
     g.setColour(theme.palette().panel);
-    g.fillRoundedRectangle(bounds, r);
+    g.fillRoundedRectangle(panelBounds.toFloat(), (float) theme.panelCornerRadius());
 
-    auto sidebar = sidebarBounds.toFloat();
+    paintSidebar(g);
+}
+
+void VitOttAudioProcessorEditor::paintSidebar(juce::Graphics& g)
+{
+    const auto sidebar = sidebarBounds.toFloat();
 
     {
         juce::DropShadow shadow(juce::Colours::black.withAlpha(0.45f),
@@ -127,47 +174,46 @@ void VitOttAudioProcessorEditor::paint(juce::Graphics& g)
     g.setColour(theme.palette().sidebar);
     g.fillRect(sidebar);
 
+    const auto drawRotated = [&](const juce::String& text,
+                                 juce::Font font,
+                                 juce::Colour colour,
+                                 float pivotY,
+                                 juce::Justification justification,
+                                 int textLen)
     {
         juce::Graphics::ScopedSaveState s(g);
         const float pivotX = sidebar.getCentreX();
-        const float pivotY = sidebar.getCentreY();
 
         g.addTransform(juce::AffineTransform::translation(-pivotX, -pivotY)
                            .rotated(-juce::MathConstants<float>::halfPi)
                            .translated(pivotX, pivotY));
 
-        g.setColour(juce::Colours::white.withAlpha(0.55f));
-        g.setFont(juce::Font(theme.scaled((float) BaseMetrics::kSidebarFontSize), juce::Font::bold));
+        g.setColour(colour);
+        g.setFont(font);
 
-        const int textLen = (int) sidebar.getHeight();
         const int textThk = (int) sidebar.getWidth();
-        juce::Rectangle<int> textRect((int) pivotX - textLen / 2,
-                                      (int) pivotY - textThk / 2,
-                                      textLen,
-                                      textThk);
-        g.drawText("vitOTTx", textRect, juce::Justification::centred);
-    }
+        const int x = justification == juce::Justification::centred
+                          ? (int) pivotX - textLen / 2
+                          : (int) pivotX;
+        const juce::Rectangle<int> rect(x, (int) pivotY - textThk / 2, textLen, textThk);
+        g.drawText(text, rect, justification);
+    };
 
-    {
-        juce::Graphics::ScopedSaveState s(g);
-        const float pivotX = sidebar.getCentreX();
-        const float pivotY = sidebar.getBottom() - theme.scaled((float) BaseMetrics::kSidebarTextBottomGap);
+    const int sidebarTextGap = theme.scaledInt(BaseMetrics::kSidebarVersionBottomGap);
 
-        g.addTransform(juce::AffineTransform::translation(-pivotX, -pivotY)
-                           .rotated(-juce::MathConstants<float>::halfPi)
-                           .translated(pivotX, pivotY));
+    drawRotated("vitOTTx",
+                juce::Font(juce::FontOptions(theme.scaled((float) BaseMetrics::kSidebarFontSize)).withStyle("Bold")),
+                juce::Colours::white.withAlpha(0.55f),
+                sidebar.getCentreY(),
+                juce::Justification::centred,
+                (int) sidebar.getHeight());
 
-        g.setColour(juce::Colours::white.withAlpha(0.3f));
-        g.setFont(juce::Font(theme.scaled((float) BaseMetrics::kSidebarVersionFontSize), juce::Font::plain));
-
-        const int textLen = juce::jmax(0, (int) sidebar.getHeight() - 2 * theme.scaledInt(BaseMetrics::kSidebarTextBottomGap));
-        const int textThk = (int) sidebar.getWidth();
-        juce::Rectangle<int> textRect((int) pivotX,
-                                      (int) pivotY - textThk / 2,
-                                      textLen,
-                                      textThk);
-        g.drawText("0.1.0", textRect, juce::Justification::centredLeft);
-    }
+    drawRotated("0.1.0",
+                juce::Font(juce::FontOptions(theme.scaled((float) BaseMetrics::kSidebarVersionFontSize))),
+                juce::Colours::white.withAlpha(0.3f),
+                sidebar.getBottom() - theme.scaled((float) BaseMetrics::kSidebarVersionBottomGap),
+                juce::Justification::centredLeft,
+                juce::jmax(0, (int) sidebar.getHeight() - 2 * sidebarTextGap));
 }
 
 void VitOttAudioProcessorEditor::resized()
@@ -262,6 +308,7 @@ void VitOttAudioProcessorEditor::resized()
     lowCrossHandle.setSnapMinimumWidth(minBandWidth);
     lowCrossHandle.setMinMidWidth(minMidWidth);
     lowCrossHandle.setCounterpartX(highX);
+    lowCrossHandle.setCounterpartCollapsed(highCollapsed);
     lowCrossHandle.setBounds(lowHandleX - handleThickness / 2, bandsInner.getY(),
                              handleThickness, bandsInner.getHeight());
 
@@ -269,8 +316,31 @@ void VitOttAudioProcessorEditor::resized()
     highCrossHandle.setSnapMinimumWidth(minBandWidth);
     highCrossHandle.setMinMidWidth(minMidWidth);
     highCrossHandle.setCounterpartX(lowX);
+    highCrossHandle.setCounterpartCollapsed(lowCollapsed);
     highCrossHandle.setBounds(highHandleX - handleThickness / 2, bandsInner.getY(),
                               handleThickness, bandsInner.getHeight());
+}
+
+void VitOttAudioProcessorEditor::showReadout(const juce::String& name, const juce::String& value)
+{
+    readout.setContent(name, value);
+
+    const juce::Font f(juce::FontOptions(theme.scaled((float) BaseMetrics::kTooltipFontSize)));
+    const int padX = theme.scaledInt(BaseMetrics::kTooltipPaddingX);
+    const int padY = theme.scaledInt(BaseMetrics::kTooltipPaddingY);
+    const int w = juce::GlyphArrangement::getStringWidthInt(f, name + "  " + value) + 2 * padX;
+    const int h = juce::roundToInt(f.getHeight()) + 2 * padY;
+    const int y = panelBounds.getY() + theme.scaledInt(BaseMetrics::kTooltipTopGap);
+    const int x = panelBounds.getCentreX() - w / 2;
+
+    readout.setBounds(x, y, w, h);
+    readout.setVisible(true);
+    readout.toFront(false);
+}
+
+void VitOttAudioProcessorEditor::hideReadout()
+{
+    readout.setVisible(false);
 }
 
 void VitOttAudioProcessorEditor::setupKnob(Knob& slot,
@@ -350,12 +420,19 @@ void VitOttAudioProcessorEditor::timerCallback()
     if (bypassed != lastBypassState)
     {
         lastBypassState = bypassed;
-        bypassButton.repaint();
-        bypassOverlay.setVisible(bypassed);
+        bypassButton.syncFromState();
+
+        auto& animator = juce::Desktop::getInstance().getAnimator();
         if (bypassed)
         {
+            bypassOverlay.setVisible(true);
             bypassOverlay.toFront(false);
             bypassButton.toFront(false);
+            animator.fadeIn(&bypassOverlay, kBypassFadeMs);
+        }
+        else
+        {
+            animator.fadeOut(&bypassOverlay, kBypassFadeMs);
         }
     }
 }

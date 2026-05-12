@@ -55,6 +55,16 @@ void Knob::attachTo(juce::AudioProcessorValueTreeState& apvts, const juce::Strin
 {
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(
         apvts, paramId, *this);
+    parameter = apvts.getParameter(paramId);
+}
+
+juce::String Knob::formatValueText() const
+{
+    if (valueFormatter)
+        return valueFormatter(getValue());
+    if (parameter != nullptr)
+        return parameter->getCurrentValueAsText();
+    return juce::String(getValue(), 2);
 }
 
 void Knob::resized()
@@ -154,6 +164,8 @@ void Knob::mouseDown(const juce::MouseEvent& e)
     dragStartY    = e.position.y;
     wasShift      = e.mods.isShiftDown();
     drag.begin(*this, e.source);
+
+    if (onShowReadout) onShowReadout(caption, formatValueText());
 }
 
 void Knob::mouseDrag(const juce::MouseEvent& e)
@@ -174,6 +186,8 @@ void Knob::mouseDrag(const juce::MouseEvent& e)
     const float delta  = (dragStartY - e.position.y) * sens;
     const float target = juce::jlimit(0.0f, 1.0f, dragStartProp + delta);
     setValue(proportionOfLengthToValue(target), juce::sendNotificationSync);
+
+    if (onShowReadout) onShowReadout(caption, formatValueText());
 }
 
 void Knob::mouseUp(const juce::MouseEvent& e)
@@ -183,6 +197,8 @@ void Knob::mouseUp(const juce::MouseEvent& e)
         return;
 
     drag.end(*this, e.source);
+
+    if (onHideReadout) onHideReadout();
 }
 
 } // namespace vitottx

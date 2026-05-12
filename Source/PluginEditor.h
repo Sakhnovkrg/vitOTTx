@@ -20,70 +20,15 @@
 
 #include "PluginProcessor.h"
 #include "ui/BandView.h"
+#include "ui/BypassButton.h"
+#include "ui/BypassOverlay.h"
 #include "ui/CrossoverHandle.h"
 #include "ui/Knob.h"
 #include "ui/Theme.h"
+#include "ui/TooltipReadout.h"
 
 namespace vitottx
 {
-
-class BypassButton : public juce::Component
-{
-public:
-    BypassButton(juce::AudioProcessorValueTreeState& a, Theme& th) : apvts(a), theme(th) {}
-
-    bool isOn() const
-    {
-        if (auto* v = apvts.getRawParameterValue("bypass"))
-            return v->load() >= 0.5f;
-        return false;
-    }
-
-    std::function<void()> onToggled;
-
-    void paint(juce::Graphics& g) override
-    {
-        auto b = getLocalBounds().toFloat();
-        const bool active = !isOn();
-        const auto accent = theme.palette().knobArcActive;
-        g.setColour(active ? accent : accent.withAlpha(0.25f));
-        g.fillEllipse(b);
-    }
-
-    void mouseDown(const juce::MouseEvent&) override
-    {
-        if (auto* p = apvts.getParameter("bypass"))
-        {
-            p->beginChangeGesture();
-            p->setValueNotifyingHost(isOn() ? 0.0f : 1.0f);
-            p->endChangeGesture();
-        }
-        repaint();
-        if (onToggled) onToggled();
-    }
-
-private:
-    juce::AudioProcessorValueTreeState& apvts;
-    Theme& theme;
-};
-
-class BypassOverlay : public juce::Component
-{
-public:
-    BypassOverlay(Theme& th) : theme(th)
-    {
-        setInterceptsMouseClicks(true, false);
-    }
-
-    void paint(juce::Graphics& g) override
-    {
-        g.setColour(theme.palette().background.withAlpha(0.7f));
-        g.fillRect(getLocalBounds());
-    }
-
-private:
-    Theme& theme;
-};
 
 class VitOttAudioProcessorEditor : public juce::AudioProcessorEditor,
                                    private juce::Timer
@@ -123,11 +68,18 @@ private:
 
     BypassButton bypassButton;
     BypassOverlay bypassOverlay;
+    TooltipReadout readout;
     bool lastBypassState = false;
+
+    static constexpr int kBypassFadeMs = 180;
+
+    void showReadout(const juce::String& name, const juce::String& value);
+    void hideReadout();
 
     void setupKnob(Knob& slot, const char* paramId, const juce::String& caption);
     void layoutLeftSection (juce::Rectangle<int> area);
     void layoutRightSection(juce::Rectangle<int> area);
+    void paintSidebar      (juce::Graphics& g);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VitOttAudioProcessorEditor)
 };
