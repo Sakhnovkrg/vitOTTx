@@ -60,6 +60,8 @@ target_sources(${PLUGIN_NAME} PRIVATE
     Source/ui/BypassButton.h
     Source/ui/BypassOverlay.h
     Source/ui/TooltipReadout.h
+    Source/ui/Sidebar.h
+    Source/ui/AboutOverlay.h
 
     Source/vital_dsp/compressor.cpp
     Source/vital_dsp/compressor.h

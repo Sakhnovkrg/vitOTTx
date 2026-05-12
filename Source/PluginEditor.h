@@ -20,11 +20,13 @@
 
 #include "PluginProcessor.h"
 #include "Settings.h"
+#include "ui/AboutOverlay.h"
 #include "ui/BandView.h"
 #include "ui/BypassButton.h"
 #include "ui/BypassOverlay.h"
 #include "ui/CrossoverHandle.h"
 #include "ui/Knob.h"
+#include "ui/Sidebar.h"
 #include "ui/Theme.h"
 #include "ui/TooltipReadout.h"
 
@@ -53,7 +55,6 @@ private:
     BandView highBand;
 
     juce::Rectangle<int> panelBounds;
-    juce::Rectangle<int> sidebarBounds;
 
     Knob inKnob;
     Knob outKnob;
@@ -70,10 +71,13 @@ private:
     BypassButton bypassButton;
     BypassOverlay bypassOverlay;
     TooltipReadout readout;
+    Sidebar        sidebar;
+    AboutOverlay   aboutOverlay;
     bool lastBypassState = false;
     bool persistSize     = false;
 
     static constexpr int kBypassFadeMs = 180;
+    static constexpr int kAboutFadeMs  = 180;
 
     void showReadout(const juce::String& name, const juce::String& value);
     void hideReadout();
@@ -81,7 +85,6 @@ private:
     void setupKnob(Knob& slot, const char* paramId, const juce::String& caption);
     void layoutLeftSection (juce::Rectangle<int> area);
     void layoutRightSection(juce::Rectangle<int> area);
-    void paintSidebar      (juce::Graphics& g);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (VitOttAudioProcessorEditor)
 };

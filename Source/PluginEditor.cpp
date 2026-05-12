@@ -51,8 +51,25 @@ VitOttAudioProcessorEditor::VitOttAudioProcessorEditor(VitOttAudioProcessor& p)
       highCrossHandle(p.getAPVTS(), theme, CrossoverHandle::Side::High),
       bypassButton(p.getAPVTS(), theme),
       bypassOverlay(theme),
-      readout(theme)
+      readout(theme),
+      sidebar(theme, "vitOTTx", JucePlugin_VersionString),
+      aboutOverlay(theme, JucePlugin_VersionString)
 {
+    addAndMakeVisible(sidebar);
+    sidebar.onTitleClick = [this]
+    {
+        aboutOverlay.setBounds(getLocalBounds());
+        aboutOverlay.setAlpha(0.0f);
+        aboutOverlay.setVisible(true);
+        aboutOverlay.toFront(true);
+        juce::Desktop::getInstance().getAnimator().fadeIn(&aboutOverlay, kAboutFadeMs);
+    };
+    addChildComponent(aboutOverlay);
+    aboutOverlay.onClose = [this]
+    {
+        juce::Desktop::getInstance().getAnimator().fadeOut(&aboutOverlay, kAboutFadeMs);
+    };
+
     addAndMakeVisible(lowBand);
     addAndMakeVisible(midBand);
     addAndMakeVisible(highBand);
@@ -173,64 +190,6 @@ void VitOttAudioProcessorEditor::paint(juce::Graphics& g)
 
     g.setColour(theme.palette().panel);
     g.fillRoundedRectangle(panelBounds.toFloat(), (float) theme.panelCornerRadius());
-
-    paintSidebar(g);
-}
-
-void VitOttAudioProcessorEditor::paintSidebar(juce::Graphics& g)
-{
-    const auto sidebar = sidebarBounds.toFloat();
-
-    {
-        juce::DropShadow shadow(juce::Colours::black.withAlpha(0.45f),
-                                theme.scaledInt(BaseMetrics::kSidebarShadowRadius),
-                                { theme.scaledInt(BaseMetrics::kSidebarShadowOffset), 0 });
-        shadow.drawForRectangle(g, sidebarBounds);
-    }
-
-    g.setColour(theme.palette().sidebar);
-    g.fillRect(sidebar);
-
-    const auto drawRotated = [&](const juce::String& text,
-                                 juce::Font font,
-                                 juce::Colour colour,
-                                 float pivotY,
-                                 juce::Justification justification,
-                                 int textLen)
-    {
-        juce::Graphics::ScopedSaveState s(g);
-        const float pivotX = sidebar.getCentreX();
-
-        g.addTransform(juce::AffineTransform::translation(-pivotX, -pivotY)
-                           .rotated(-juce::MathConstants<float>::halfPi)
-                           .translated(pivotX, pivotY));
-
-        g.setColour(colour);
-        g.setFont(font);
-
-        const int textThk = (int) sidebar.getWidth();
-        const int x = justification == juce::Justification::centred
-                          ? (int) pivotX - textLen / 2
-                          : (int) pivotX;
-        const juce::Rectangle<int> rect(x, (int) pivotY - textThk / 2, textLen, textThk);
-        g.drawText(text, rect, justification);
-    };
-
-    const int sidebarTextGap = theme.scaledInt(BaseMetrics::kSidebarVersionBottomGap);
-
-    drawRotated("vitOTTx",
-                juce::Font(juce::FontOptions(theme.scaled((float) BaseMetrics::kSidebarFontSize)).withStyle("Bold")),
-                juce::Colours::white.withAlpha(0.55f),
-                sidebar.getCentreY(),
-                juce::Justification::centred,
-                (int) sidebar.getHeight());
-
-    drawRotated("0.1.0",
-                juce::Font(juce::FontOptions(theme.scaled((float) BaseMetrics::kSidebarVersionFontSize))),
-                juce::Colours::white.withAlpha(0.3f),
-                sidebar.getBottom() - theme.scaled((float) BaseMetrics::kSidebarVersionBottomGap),
-                juce::Justification::centredLeft,
-                juce::jmax(0, (int) sidebar.getHeight() - 2 * sidebarTextGap));
 }
 
 void VitOttAudioProcessorEditor::resized()
@@ -248,7 +207,11 @@ void VitOttAudioProcessorEditor::resized()
 
     auto fullArea = getLocalBounds();
     const int sidebarW = theme.scaledInt(BaseMetrics::kSidebarWidth);
-    sidebarBounds = fullArea.removeFromLeft(sidebarW);
+    const auto sidebarBounds = fullArea.removeFromLeft(sidebarW);
+    sidebar.setBounds(sidebarBounds);
+
+    if (aboutOverlay.isVisible())
+        aboutOverlay.setBounds(getLocalBounds());
 
     const int btnD       = theme.scaledInt(BaseMetrics::kBypassButtonDiameter);
     const int btnTopGap  = theme.scaledInt(BaseMetrics::kBypassButtonTopGap);

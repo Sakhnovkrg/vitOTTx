@@ -34,6 +34,7 @@ public:
         : apvts(a), theme(th)
     {
         fade = targetFade = isOn() ? 0.0f : 1.0f;
+        setMouseCursor(juce::MouseCursor::PointingHandCursor);
     }
 
     bool isOn() const
