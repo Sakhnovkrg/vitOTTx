@@ -49,6 +49,7 @@ private:
     BandView highBand;
 
     juce::Rectangle<int> panelBounds;
+    juce::Rectangle<int> sidebarBounds;
 
     Knob inKnob;
     Knob outKnob;

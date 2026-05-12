@@ -26,6 +26,7 @@ namespace vitottx
 struct Palette
 {
     juce::Colour background       { 0xff0d1218 };
+    juce::Colour sidebar          { 0xff141a22 };
     juce::Colour panel            { 0xff06090d };
     juce::Colour panelOutline     { 0xff000004 };
     juce::Colour barFillUpper     { 0xff168f78 };
@@ -68,7 +69,13 @@ struct BaseMetrics
     static constexpr float kKnobDragSensitivity     = 0.0024f;
     static constexpr float kKnobDragSensitivityFine = 0.00048f;
 
-    static constexpr int   kReferenceWidth        = 640;
+    static constexpr int   kSidebarWidth          = 30;
+    static constexpr int   kSidebarTextBottomGap  = 10;
+    static constexpr int   kSidebarFontSize       = 18;
+    static constexpr int   kSidebarVersionFontSize = 10;
+    static constexpr int   kSidebarShadowRadius   = 6;
+    static constexpr int   kSidebarShadowOffset   = 2;
+    static constexpr int   kReferenceWidth        = 640 + kSidebarWidth;
     static constexpr int   kReferenceHeight       = 180;
 };
 

@@ -16,7 +16,7 @@ if not exist libs\JUCE\CMakeLists.txt (
     git submodule add https://github.com/juce-framework/JUCE.git libs/JUCE
 )
 
-git submodule update --init --recursive
+git submodule update --init --recursive --depth 1
 
 if not exist config.bat (
     copy /Y config.bat.example config.bat

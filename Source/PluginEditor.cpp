@@ -94,6 +94,60 @@ void VitOttAudioProcessorEditor::paint(juce::Graphics& g)
     const float r = (float) theme.panelCornerRadius();
     g.setColour(theme.palette().panel);
     g.fillRoundedRectangle(bounds, r);
+
+    auto sidebar = sidebarBounds.toFloat();
+
+    {
+        juce::DropShadow shadow(juce::Colours::black.withAlpha(0.45f),
+                                theme.scaledInt(BaseMetrics::kSidebarShadowRadius),
+                                { theme.scaledInt(BaseMetrics::kSidebarShadowOffset), 0 });
+        shadow.drawForRectangle(g, sidebarBounds);
+    }
+
+    g.setColour(theme.palette().sidebar);
+    g.fillRect(sidebar);
+
+    {
+        juce::Graphics::ScopedSaveState s(g);
+        const float pivotX = sidebar.getCentreX();
+        const float pivotY = sidebar.getCentreY();
+
+        g.addTransform(juce::AffineTransform::translation(-pivotX, -pivotY)
+                           .rotated(-juce::MathConstants<float>::halfPi)
+                           .translated(pivotX, pivotY));
+
+        g.setColour(juce::Colours::white.withAlpha(0.55f));
+        g.setFont(juce::Font(theme.scaled((float) BaseMetrics::kSidebarFontSize), juce::Font::bold));
+
+        const int textLen = (int) sidebar.getHeight();
+        const int textThk = (int) sidebar.getWidth();
+        juce::Rectangle<int> textRect((int) pivotX - textLen / 2,
+                                      (int) pivotY - textThk / 2,
+                                      textLen,
+                                      textThk);
+        g.drawText("vitOTTx", textRect, juce::Justification::centred);
+    }
+
+    {
+        juce::Graphics::ScopedSaveState s(g);
+        const float pivotX = sidebar.getCentreX();
+        const float pivotY = sidebar.getBottom() - theme.scaled((float) BaseMetrics::kSidebarTextBottomGap);
+
+        g.addTransform(juce::AffineTransform::translation(-pivotX, -pivotY)
+                           .rotated(-juce::MathConstants<float>::halfPi)
+                           .translated(pivotX, pivotY));
+
+        g.setColour(juce::Colours::white.withAlpha(0.3f));
+        g.setFont(juce::Font(theme.scaled((float) BaseMetrics::kSidebarVersionFontSize), juce::Font::plain));
+
+        const int textLen = juce::jmax(0, (int) sidebar.getHeight() - 2 * theme.scaledInt(BaseMetrics::kSidebarTextBottomGap));
+        const int textThk = (int) sidebar.getWidth();
+        juce::Rectangle<int> textRect((int) pivotX,
+                                      (int) pivotY - textThk / 2,
+                                      textLen,
+                                      textThk);
+        g.drawText("0.1.0", textRect, juce::Justification::centredLeft);
+    }
 }
 
 void VitOttAudioProcessorEditor::resized()
@@ -109,7 +163,11 @@ void VitOttAudioProcessorEditor::resized()
     const int leftSectionWidth  = 3 * knobSlot + 2 * gap;
     const int rightSectionWidth = knobSlot;
 
-    auto area = getLocalBounds().reduced(outerPadding);
+    auto fullArea = getLocalBounds();
+    const int sidebarW = theme.scaledInt(BaseMetrics::kSidebarWidth);
+    sidebarBounds = fullArea.removeFromLeft(sidebarW);
+
+    auto area = fullArea.reduced(outerPadding);
     auto leftArea  = area.removeFromLeft (leftSectionWidth);   area.removeFromLeft (gap);
     auto rightArea = area.removeFromRight(rightSectionWidth);  area.removeFromRight(gap);
     auto bandsArea = area;
