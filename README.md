@@ -1,9 +1,10 @@
 # vitOTTx
 
-Multiband compressor
+A cross-platform multiband compressor audio plugin (VST3 / AU / LV2).
 
-## Requirements
-SSE2-compliant CPU.
+[![Download](https://img.shields.io/github/v/release/Sakhnovkrg/vitOTTx?label=download&style=for-the-badge)](https://github.com/Sakhnovkrg/vitOTTx/releases/latest)
+
+![vitOTTx demo](licecap.gif)
 
 ## Building (Windows)
 
@@ -13,19 +14,26 @@ SSE2-compliant CPU.
 
 Artifacts land in `build\vitOTTx_artefacts\<Config>\`.
 
-## Building (macOS / Linux)
+## Building (macOS)
 
-```sh
-git submodule update --init --recursive
-cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-```
+1. `./init.sh` — installs CMake/Ninja via Homebrew and initializes the JUCE submodule.
+2. `./build.sh` (Debug) or `./build.sh Release`.
+3. `./build-xcode.sh` — generate & open an Xcode project if you prefer debugging there.
+
+## Building (Linux)
+
+1. Install `cmake`, `ninja-build` and a C++17 toolchain via your package manager.
+2. `./build.sh` (Debug) or `./build.sh Release` — submodules are initialized automatically (shallow clone).
 
 ## License
 
 The entire source is licensed under the GPLv3 (see `LICENSE`). If you distribute the source or built binaries, you must comply with that license.
 
-## Links
-- Original DSP: https://github.com/mtytel/vital
-- Upstream fork: https://github.com/edgjj/vitOTT
-- JUCE: https://github.com/juce-framework/JUCE
+## Acknowledgements
+- [Vital](https://github.com/mtytel/vital) — Matt Tytel's synth, source of the original OTT compressor DSP
+- [vitOTT](https://github.com/edgjj/vitOTT) — Yegor Suslin's fork that this project is based on
+- [JUCE](https://github.com/juce-framework/JUCE) — audio plugin framework
+
+## Support
+
+If you find this useful, consider [supporting the developer](https://dsgdnb.com/donate).

@@ -25,19 +25,19 @@ namespace vitottx
 
 struct Palette
 {
-    juce::Colour background       { 0xff0d1218 };
-    juce::Colour sidebar          { 0xff141a22 };
-    juce::Colour panel            { 0xff06090d };
+    juce::Colour background       { 0xff11171f };
+    juce::Colour sidebar          { 0xff181f28 };
+    juce::Colour panel            { 0xff0a0e13 };
 
     juce::Colour barFillUpper     { 0xff168f78 };
     juce::Colour barFillLower     { 0xff083a2f };
-    juce::Colour barFillDisabled  { 0xff2c3038 };
+    juce::Colour barFillDisabled  { 0xff30343c };
     juce::Colour barStripe        { 0x33ffffff };
     juce::Colour hoverHandle      { 0xccffffff };
     juce::Colour meter            { 0xff1de9b6 };
 
-    juce::Colour knobBody         { 0xff10161c };
-    juce::Colour knobArcTrack     { 0xff1f262e };
+    juce::Colour knobBody         { 0xff141a22 };
+    juce::Colour knobArcTrack     { 0xff232a32 };
     juce::Colour knobArcActive    { 0xff1de9b6 };
     juce::Colour knobPointer      { 0xffffffff };
 
