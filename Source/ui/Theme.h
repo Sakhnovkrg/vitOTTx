@@ -64,6 +64,8 @@ struct BaseMetrics
 
     static constexpr float kThresholdDragMultiplier = 0.5f;
     static constexpr float kRatioDragMultiplier     = 0.6f;
+    static constexpr float kCrossoverDragMultiplier = 0.5f;
+    static constexpr int   kCrossoverCollapseResistance = 24;
 
     // Pixel-rate sensitivity for rotary drags. 0.0024 ≈ full sweep over 420 px.
     static constexpr float kKnobDragSensitivity     = 0.0024f;

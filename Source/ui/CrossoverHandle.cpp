@@ -121,10 +121,10 @@ void CrossoverHandle::mouseDrag(const juce::MouseEvent& e)
         return;
 
     const int   startX  = freqToX(dragStartFreq, rangeLeft, rangeRight);
-    const float deltaX  = e.source.getScreenPosition().x - dragStartSourcePos.x;
+    const float deltaX  = (e.source.getScreenPosition().x - dragStartSourcePos.x)
+                          * BaseMetrics::kCrossoverDragMultiplier;
     int         targetX = startX + juce::roundToInt(deltaX);
 
-    // Coupling: keep at least minMidWidth between this handle and its counterpart.
     if (counterpartX >= 0)
     {
         if (side == Side::Low)
@@ -133,16 +133,24 @@ void CrossoverHandle::mouseDrag(const juce::MouseEvent& e)
             targetX = juce::jmax(targetX, counterpartX + minMidWidth);
     }
 
-    // Snap to extreme when adjacent edge-band would be narrower than snapMinWidth.
+    const int resistance = BaseMetrics::kCrossoverCollapseResistance;
     if (side == Side::Low)
     {
-        if (targetX - rangeLeft < snapMinWidth)
-            targetX = rangeLeft;
+        const int stickEdge = rangeLeft + snapMinWidth;
+        if (targetX < stickEdge)
+        {
+            const int overshoot = stickEdge - targetX;
+            targetX = (overshoot >= resistance) ? rangeLeft : stickEdge;
+        }
     }
     else
     {
-        if (rangeRight - targetX < snapMinWidth)
-            targetX = rangeRight;
+        const int stickEdge = rangeRight - snapMinWidth;
+        if (targetX > stickEdge)
+        {
+            const int overshoot = targetX - stickEdge;
+            targetX = (overshoot >= resistance) ? rangeRight : stickEdge;
+        }
     }
 
     targetX = juce::jlimit(rangeLeft, rangeRight, targetX);
